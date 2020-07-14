@@ -30,6 +30,7 @@ hasRh <- function(x){
    if(grepl("Rh", dt_msmt)){
       print(toString(dt_name))
    }
+   return(NULL)
 }
 
 apply(db_info, 1, hasRh)
