@@ -24,15 +24,30 @@ for(row_num in 1:nrow(db_info)){
 }
 
 #Alternative Method
-hasRh <- function(x){
-   dt_msmt <- x[11]
-   dt_name <- x[1]
+hasRh <- function(x, msmt_col, name_col){
+   dt_msmt <- x[msmt_col]
+   dt_name <- x[name_col]
    if(grepl("Rh", dt_msmt)){
       print(toString(dt_name))
+      return(dt_name)
    }
    return(NULL)
 }
 
-apply(db_info, 1, hasRh)
+rh_dataset_names <- apply(db_info, 1, hasRh, 11, 1) #there seems to be a lot of null values, is there a cleaner way to get a list of names w/o nulls using the apply function?
+
+```
+
+## Goal 2
+```{r}
+
+for(rhds in rh_dataset_names){
+  rhds <- toString(rhds)
+  if(rhds != ""){#if I find a way to generate a list of values w/o NULLs this can be deleted
+    ds_data <- csr_dataset(rhds)
+    ports_table <- ds_data$ports
+    apply(ports_table, 1, hasRh, 2, 1)
+  }
+}
 ```
 
