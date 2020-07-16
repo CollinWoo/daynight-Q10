@@ -10,20 +10,11 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(cosore)
+library(dplyr)
 db_info <- csr_database()
 results <- list()
 ```
-## Goal 1
-```{r goal1}
-for(row_num in 1:nrow(db_info)){
-  dt_msmt <- db_info$CSR_MSMT_VAR[row_num]
-  dt_name <- db_info$CSR_DATASET[row_num]
-  if(grepl("Rh", dt_msmt)){
-    print(dt_name)
-  }
-}
-
-#Alternative Method
+```{r hasRh}
 hasRh <- function(x, msmt_col, name_col){
    dt_msmt <- x[msmt_col]
    dt_name <- x[name_col]
@@ -33,21 +24,36 @@ hasRh <- function(x, msmt_col, name_col){
    }
    return(NULL)
 }
+```
 
+## Goal 1
+```{r goal1, eval=FALSE, echo=FALSE}
+for(row_num in 1:nrow(db_info)){
+  dt_msmt <- db_info$CSR_MSMT_VAR[row_num]
+  dt_name <- db_info$CSR_DATASET[row_num]
+  if(grepl("Rh", dt_msmt)){
+    print(dt_name)
+  }
+}
+
+#Alternative Method
 rh_dataset_names <- apply(db_info, 1, hasRh, 11, 1) #there seems to be a lot of null values, is there a cleaner way to get a list of names w/o nulls using the apply function?
 
 ```
+```{r new-goal1}
+rh_dataset_names <- filter(db_info, grepl("Rh", CSR_MSMT_VAR))
+rh_dataset_names <- pull(rh_dataset_names, CSR_DATASET)
+print(rh_dataset_names)
+```
 
 ## Goal 2
-```{r}
+```{r Goal 2}
 
 for(rhds in rh_dataset_names){
-  rhds <- toString(rhds)
-  if(rhds != ""){#if I find a way to generate a list of values w/o NULLs this can be deleted
-    ds_data <- csr_dataset(rhds)
-    ports_table <- ds_data$ports
-    apply(ports_table, 1, hasRh, 2, 1)
-  }
+  ds_data <- csr_dataset(rhds)
+  ports_table <- ds_data$ports
+  apply(ports_table, 1, hasRh, 2, 1)
+  filter(ports_table, CSR_MSMT_VAR == "Rh")
 }
 ```
 
