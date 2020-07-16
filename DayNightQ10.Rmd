@@ -48,12 +48,16 @@ print(rh_dataset_names)
 
 ## Goal 2
 ```{r Goal 2}
-
+results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   ports_table <- ds_data$ports
   apply(ports_table, 1, hasRh, 2, 1)
-  filter(ports_table, CSR_MSMT_VAR == "Rh")
+  Rh_ports <- filter(ports_table, CSR_MSMT_VAR == "Rh")
+  results[[rhds]] <- Rh_ports
 }
+
+final_results <- bind_rows(results, .id = "Dataset")
+print(final_results)
 ```
 
