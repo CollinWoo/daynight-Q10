@@ -14,17 +14,6 @@ library(dplyr)
 db_info <- csr_database()
 results <- list()
 ```
-```{r hasRh}
-hasRh <- function(x, msmt_col, name_col){
-   dt_msmt <- x[msmt_col]
-   dt_name <- x[name_col]
-   if(grepl("Rh", dt_msmt)){
-      print(toString(dt_name))
-      return(dt_name)
-   }
-   return(NULL)
-}
-```
 
 ## Goal 1
 ```{r goal1, eval=TRUE, echo=FALSE}
@@ -33,11 +22,14 @@ for(rhds in rh_dataset_names){
   print(rhds)
 }
 ```
+
+<!--
 ```{r new-goal1}
 rh_dataset_names <- filter(db_info, grepl("Rh", CSR_MSMT_VAR))
 rh_dataset_names <- pull(rh_dataset_names, CSR_DATASET)
 print(rh_dataset_names)
 ```
+-->
 
 ## Goal 2
 ```{r Goal 2}
@@ -45,7 +37,6 @@ results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   ports_table <- ds_data$ports
-  apply(ports_table, 1, hasRh, 2, 1)
   Rh_ports <- filter(ports_table, CSR_MSMT_VAR == "Rh")
   results[[rhds]] <- Rh_ports
 }
