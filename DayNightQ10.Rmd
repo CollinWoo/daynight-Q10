@@ -27,18 +27,11 @@ hasRh <- function(x, msmt_col, name_col){
 ```
 
 ## Goal 1
-```{r goal1, eval=FALSE, echo=FALSE}
-for(row_num in 1:nrow(db_info)){
-  dt_msmt <- db_info$CSR_MSMT_VAR[row_num]
-  dt_name <- db_info$CSR_DATASET[row_num]
-  if(grepl("Rh", dt_msmt)){
-    print(dt_name)
-  }
+```{r goal1, eval=TRUE, echo=FALSE}
+rh_dataset_names <- db_info[grep("Rh", db_info$CSR_MSMT_VAR),1][[1]]
+for(rhds in rh_dataset_names){
+  print(rhds)
 }
-
-#Alternative Method
-rh_dataset_names <- apply(db_info, 1, hasRh, 11, 1) #there seems to be a lot of null values, is there a cleaner way to get a list of names w/o nulls using the apply function?
-
 ```
 ```{r new-goal1}
 rh_dataset_names <- filter(db_info, grepl("Rh", CSR_MSMT_VAR))
