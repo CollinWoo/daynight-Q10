@@ -4,6 +4,8 @@ author: "Colin Wu"
 date: "`r Sys.Date()`"
 output: 
   html_document:
+    toc: yes
+    toc_float: yes
     code_folding: hide
 ---
 
@@ -43,5 +45,25 @@ for(rhds in rh_dataset_names){
 
 final_results <- bind_rows(results, .id = "Dataset")
 print(final_results)
+```
+
+## calc_q10 Function
+```{r Q10 Function}
+calc_q10 <- function(temp, resp){
+  resp <- resp[resp>=0]
+  lnresp <- log(resp)
+  linReg <- lm(lnresp~temp)
+  b <- linReg$coefficients[["temp"]]
+  q10 <- exp(10*b)
+  return(q10)
+}
+
+```
+```{r Q10 Function Test}
+set.seed(2020)
+x <- 1:20
+y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
+plot(x,y)
+cat("The Q10 Value is", calc_q10(x,y))
 ```
 
