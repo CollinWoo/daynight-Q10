@@ -45,3 +45,17 @@ final_results <- bind_rows(results, .id = "Dataset")
 print(final_results)
 ```
 
+## Ts Percentage
+```{r Ts Percentage}
+for(rhds in rh_dataset_names){
+  ds_data <- csr_dataset(rhds)
+  data_table <- ds_data$data
+  column_names <- colnames(data_table)
+  temp_fields <- column_names[grep("CSR_T[0-9]", column_names)]
+  for(x in temp_fields){
+    print(x)
+  }
+}
+
+```
+
