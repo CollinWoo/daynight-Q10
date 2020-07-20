@@ -5,6 +5,15 @@ date: "7/20/2020"
 output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(cosore)
+library(dplyr)
+library(dplyr)
+library(ggplot2)
+db_info <- csr_database()
+results <- list()
+```
 
 ## Jinshi: take one dataset as an example
 ```{r}
