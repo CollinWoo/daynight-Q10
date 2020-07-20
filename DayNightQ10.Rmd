@@ -50,7 +50,9 @@ print(final_results)
 ## calc_q10 Function
 ```{r Q10 Function}
 calc_q10 <- function(temp, resp){
-  resp <- resp[resp>=0]
+  positives <- resp >= 0
+  resp <- resp[positives]
+  temp <- temp[positives]
   lnresp <- log(resp)
   linReg <- lm(lnresp~temp)
   b <- linReg$coefficients[["temp"]]
