@@ -47,13 +47,15 @@ print(final_results)
 
 ## Ts Percentage
 ```{r Ts Percentage}
+main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
-  data_table <- ds_data$data
-  column_names <- colnames(data_table)
-  temp_fields <- column_names[grep("CSR_T[0-9]", column_names)]
-  for(x in temp_fields){
-    print(x)
+  dsd <- ds_data$data
+  column_names <- names(dsd)
+  temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
+  results <- data.frame(columns = temperature_columns, depth = NA, q10 = NA, n = NA)
+  for(tcol in temperature_columns){
+    print(dsd[tcol])
   }
 }
 
