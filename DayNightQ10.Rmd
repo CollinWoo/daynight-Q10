@@ -34,7 +34,7 @@ print(rh_dataset_names)
 -->
 
 ## Goal 2
-```{r Goal 2}
+```{r Goal 2, message = FALSE}
 results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -70,7 +70,7 @@ cat("The Q10 Value is", calc_q10(x,y))
 ```
 
 ## Ts Percentage
-```{r Ts Percentage}
+```{r Ts Percentage, message = FALSE, warning=FALSE}
 main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
