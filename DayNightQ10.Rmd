@@ -50,7 +50,7 @@ print(final_results)
 ## calc_q10 Function
 ```{r Q10 Function}
 calc_q10 <- function(temp, resp){
-  positives <- resp >= 0
+  positives <- resp > 0 & !is.na(temp) & !is.na(resp)
   resp <- resp[positives]
   temp <- temp[positives]
   lnresp <- log(resp)
@@ -79,7 +79,7 @@ for(rhds in rh_dataset_names){
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   results <- data.frame(columns = temperature_columns, depth = NA, q10 = NA, n = NA)
   for(tcol in temperature_columns){
-    print(dsd[tcol])
+    print(calc_q10(dsd[[tcol]], dsd$CSR_FLUX_CO2))
   }
 }
 
