@@ -79,8 +79,20 @@ for(rhds in rh_dataset_names){
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   results <- data.frame(columns = temperature_columns, depth = NA, q10 = NA, n = NA)
   for(tcol in temperature_columns){
-    print(calc_q10(dsd[[tcol]], dsd$CSR_FLUX_CO2))
+    temp <- dsd[[tcol]]
+    resp <- dsd$CSR_FLUX_CO2
+    results$q10[results$columns == tcol] = calc_q10(temp, resp)
+    results$n[results$columns == tcol] = length(temp[!is.na(temp) & !is.na(resp)])
+    depth <- gsub("^CSR_T", "", tcol)
+    if(!is.na(as.numeric(depth))){
+      depth <- as.numeric(depth)
+    }else{
+      depth <- -1
+    }
+    results$depth[results$columns == tcol] = depth
   }
+  main_results[[rhds]] <- results
 }
-
+main_results <- bind_rows(main_results, .id = "Dataset")
+print(main_results)
 ```
