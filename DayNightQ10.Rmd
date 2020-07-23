@@ -73,7 +73,7 @@ cat("The Q10 Value is", calc_q10(x,y))
 ```
 
 ## Ts Percentage
-```{r Ts Percentage, message = FALSE, warning=FALSE}
+```{r Ts Percentage, message = FALSE, warning=FALSE, eval= FALSE}
 main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -100,3 +100,15 @@ for(rhds in rh_dataset_names){
 main_results <- bind_rows(main_results, .id = "Dataset")
 print(main_results)
 ```
+
+## Q10 By Week
+```{r by week, message=FALSE}
+for(rhds in rh_dataset_names){
+  ds_data <- csr_dataset(rhds)
+  dsd <- ds_data$data
+  rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
+  x <- dsd %>% filter(CSR_PORT %in% rh_ports)
+  print(x)
+}
+```
+
