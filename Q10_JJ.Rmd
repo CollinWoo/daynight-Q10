@@ -1,0 +1,141 @@
+---
+title: "Untitled"
+author: "Jinshi"
+date: "7/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(cosore)
+library(dplyr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+db_info <- csr_database()
+results <- list()
+```
+
+## Jinshi: take one dataset as an example
+```{r}
+first_rh_dset <- csr_dataset("d20190424_ZHANG_maple")
+first_rh_data <- first_rh_dset$data
+colnames(first_rh_data)
+# There are 7 columns, and each column including:
+# "CSR_PORT": port number
+# "CSR_TIMESTAMP_BEGIN": Begin time
+# "CSR_TIMESTAMP_END": end time
+# "CSR_FLUX_CO2": Rh flux
+# "CSR_R2": linear fitting R2
+# "CSR_SM30": Soil moisture           
+# "CSR_T5": Soil temperature
+
+# Check NA flux and T5
+# You can see that there are no missing Rh, but 43 T5 missing values
+first_rh_data %>% 
+  select(CSR_FLUX_CO2, CSR_T5) %>% 
+  mutate(
+    RH_YN = case_when(
+      !is.na(CSR_FLUX_CO2)  ~ "YES",
+      TRUE ~ "NO"),
+    T5_YN = case_when(
+      !is.na(CSR_T5) ~ "YES",
+      TRUE ~ "NO")) %>% 
+  count(RH_YN, T5_YN)
+
+# because colname may differ in different dataset, it is better we rename the flux and T5 column
+# we also need to calculate the log(Rh) and we need to remove negative fluxes before log transform
+first_rh_data %>% 
+  rename('CSR_Rh' = 'CSR_FLUX_CO2',
+         'CSR_TS' = 'CSR_T5') %>% 
+  filter(CSR_Rh > 0 & !is.na(CSR_TS)) %>% 
+  mutate(Rh_log = log(CSR_Rh)) ->
+  first_rh_data
+
+# we also need to get the hour information, we also need to give a "day-or-night label" based on the hour information
+# we also want to YYYY-MM-DDD information because we want to calculate a Q10 value for each day
+first_rh_data %>% 
+  mutate(YYYMMDDD = as.Date(CSR_TIMESTAMP_END, "%Y%m%d"),
+         end_hour = hour(CSR_TIMESTAMP_END),
+         DN_label = case_when(
+           end_hour %in% c(7:18) ~ "Day", #need to discuss when is day time
+           TRUE ~ "Night")) ->
+  first_rh_data
+  
+```
+
+## Q10 calculation function
+```{r}
+csr_rh_Q10 <- function(sdata){
+  m <- lm(Rh_log ~ CSR_TS, data = sdata)
+  intercept <- summary(m)$coefficients[2,1] 
+  Q10 <- exp(intercept*10) %>% round(3)
+  return(Q10)
+}
+
+# create a test dataset to test the Q10 function
+# if we assume Q10=2, and when TS=0, Rh = 0.5, then 
+Q10_test_data <- tibble(CSR_TS = c(1:20),
+                        Rh = 0.5*exp(log(2)/10*CSR_TS),
+                        Rh_log = log(Rh))
+
+
+csr_rh_Q10(Q10_test_data) # results show that our Q10 calculation is correst
+```
+
+## calculate day-time and night-time Q10
+```{r}
+# then we want to calculate day-time and night-time Q10 for each day
+first_rh_data %>% 
+  select(YYYMMDDD) %>% 
+  unique() ->
+  first_rh_day
+# it turns out that we have 472 days within this dataset
+# so we expect 472 day-time Q10 and 472 night-time Q10
+# we need to use for loop to do this
+# i = 6
+
+Q10_results <- function() {
+  out <- data.frame() # create a data frame to hold the results
+  for(i in 1:nrow(first_rh_day)){
+    first_rh_data %>% 
+      filter(YYYMMDDD == first_rh_day$YYYMMDDD[i] & DN_label == "Day") ->
+      sub_day
+    
+    first_rh_data %>% 
+      filter(YYYMMDDD == first_rh_day$YYYMMDDD[i] & DN_label == "Night") ->
+      sub_night
+    
+    # calculate Q10
+    Q10_day <- ifelse(nrow(sub_day) < 6, NA, csr_rh_Q10(sub_day)) # only calculate Q10 when have more than 6 observations
+    Q10_night <- ifelse(nrow(sub_night) < 6, NA, csr_rh_Q10(sub_night)) # only calculate Q10 when have more than 6 observations
+    
+    print(paste0("*****", i))
+    
+    # combine results
+    out <- rbind(out,
+                 data.frame(i, "d20190424_ZHANG_maple", sub_day$YYYMMDDD[1], Q10_day, Q10_night))
+    
+  }
+  return(out)
+  colnames(out) <- c("ID", "Data_set", "Time", "Q10_day", "Q10_night")
+} 
+```
+
+
+```{r}
+first_Q10_results <- Q10_results()
+```
+
+
+```{r}
+# visulation of the Q10 for the first dataset
+first_Q10_results %>% 
+  select(Q10_day, Q10_night) %>%
+  tidyr::gather() %>% 
+  filter(value < 30) %>% 
+  ggplot(aes(key, value, fill = key)) +
+  geom_violin(draw_quantiles = c(0.25,0.5,0.75)) +
+  labs(x = "d20190424_ZHANG_maple",
+       y = expression(Q[10]))
+```
