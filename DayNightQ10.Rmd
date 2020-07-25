@@ -120,7 +120,7 @@ csr_q10 <- function(temp){
 
 ```
 
-```{r by week, message=FALSE}
+```{r by week, message=FALSE, warning=FALSE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -135,9 +135,20 @@ for(rhds in rh_dataset_names){
   dsd %>% select(WOY, YEAR) %>% unique() -> num_weeks
   
   for(tcol in temperature_columns){
-    dsd$temp <- dsd[tcol]
-    dsd %>% group_by(WOY, YEAR)
+    dsd$temp <- dsd[[tcol]]
+    depth <- gsub("^CSR_T", "", tcol)
+    #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
+    if(!is.na(as.numeric(depth))){
+      depth <- as.numeric(depth)
+    }else{
+      depth <- -1
+    }
+    depth <- toString(depth)
+    dsd %>% group_by(YEAR, WOY) %>% summarize(DATASET = rhds, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% filter(!is.na(Q10))-> week_Q10[[depth]]
   }
 }
+week_Q10 <- bind_rows(week_Q10, .id = "Depth")
+week_Q10 <- week_Q10[, c(4, 1:3, 5:7)]
+print(week_Q10, n = 100)
 ```
 
