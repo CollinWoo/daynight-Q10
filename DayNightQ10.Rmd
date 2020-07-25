@@ -103,23 +103,6 @@ print(main_results)
 ```
 
 ## Q10 By Week
-```{r 1 variable Q10 function}
-csr_q10 <- function(temp){
-  positives <- resp > 0 & !is.na(temp) & !is.na(resp)
-  resp <- resp[positives]
-  temp <- temp[positives]
-  if(length(CSR_FLUX_CO2) < 4){
-    return(NA)
-  }
-  lnresp <- log(CSR_FLUX_CO2)
-  linReg <- lm(lnresp~temp)
-  b <- linReg$coefficients[["temp"]]
-  q10 <- exp(10*b)
-  return(q10)
-}
-
-```
-
 ```{r by week, message=FALSE, warning=FALSE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
