@@ -113,7 +113,7 @@ for(rhds in rh_dataset_names){
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
 
-  dsd %>% filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2)) %>% mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
+  dsd %>% filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>% mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -129,7 +129,7 @@ for(rhds in rh_dataset_names){
   }
 }
 week_Q10 <- bind_rows(week_Q10, .id = "ID")
-week_Q10[, c(4, 2:3, 5:7)] %>% arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
+week_Q10[, c(4, 2:3, 5:8)] %>% arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
 print(week_Q10, n = 1156)
 ```
 
