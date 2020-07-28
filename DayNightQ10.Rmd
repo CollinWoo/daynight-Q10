@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(cosore)
 library(dplyr)
 library(lubridate)
+library(NISTunits)
 db_info <- csr_database()
 results <- list()
 ```
@@ -132,4 +133,19 @@ week_Q10 <- bind_rows(week_Q10, .id = "ID")
 week_Q10[, c(4, 2:3, 5:7)] %>% arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
 print(week_Q10, n = 1156)
 ```
+
+## Sunset/Sunrise Calculation
+```{r}
+daytime <- function(lat, long, doy){
+  lat <- NISTdegTOradian(lat)
+  long <- NISTdegTOradian(long)
+  frac_yr = 2 * pi/365 * (doy - 1 + (hr-12)/24)
+  eqtime = 229.18*(0.000075+0.001868*cos(frac_yr)-0.032077*sin(frac_yr)-0.014615*cos(2*frac_yr)-0.040849*sin(2*frac_yr))
+  decl =  0.006918-0.399912*cos(frac_yr)+0.070257*sin(frac_yr)-0.006758*cos(2*frac_yr)+0.000907*sin(2*frac_yr)-0.002697*cos(3*frac_yr)+0.00148*sin(3*frac_yr)
+  ha = acos(cos(NISTdegTOradian(90.833))/(cos(lat)*cos(decl))-tan(lat)*tan(decl))
+  sunrise=720-4*(long+ha)-eqtime
+  sunset=720-4*(long-ha)-eqtime
+}
+```
+
 
