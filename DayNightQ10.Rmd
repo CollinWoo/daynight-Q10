@@ -77,7 +77,7 @@ cat("The Q10 Value is", calc_q10(x,y))
 ```
 
 ## Ts Percentage
-```{r Ts Percentage, message = FALSE, warning=FALSE, eval = FALSE}
+```{r Ts Percentage, message = FALSE, warning=FALSE}
 main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -106,7 +106,7 @@ print(main_results)
 ```
 
 ## Q10 By Week
-```{r by week, message=FALSE, warning=FALSE, eval=FALSE}
+```{r by week, message=FALSE, warning=FALSE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
