@@ -111,12 +111,23 @@ week_Q10 <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
+  ds_desc <- ds_data$description
   
   column_names <- names(dsd)
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
-
+  
+  date <- as.Date(dsd$CSR_TIMESTAMP_END)
+  lon <- ds_desc$CSR_LONGITUDE
+  lat <- ds_desc$CSR_LATITUDE
+  print(date[[1]])
+  sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"))
+  #sunrise_set <- sunrise.set(lat, lon, date)
+  sunrise <- sunrise_set[["sunrise"]]
+  sunset <- sunrise_set[["sunset"]]
+  
   dsd %>% filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>% mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
+#  , DAY_NIGHT = case_when(sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day", TRUE ~ "night")
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -153,8 +164,18 @@ lon <- -77.171990
 date <- "2020/07/29"
 date2 <- as.Date(date)
 timez = Sys.timezone()
-print(sunrise.set(lat, lon, date2 + 1, timezone=timez))
-print(getSunlightTimes(date2, lat, lon, keep = c("sunrise","sunset", "sunriseEnd","sunsetStart"), tz=timez))
+sunrise_set = sunrise.set(lat, lon, date2 + 1, timezone=timez)
+print(sunrise_set)
+sunset_rise = getSunlightTimes(date2, lat, lon, keep = c("sunrise", "sunset"), tz = timez)
+print(sunset_rise)
+print(sunset_rise[["sunrise"]])
+print(sunset_rise[["sunset"]])
+print(sunrise_set)
+sunrise = sunrise_set[[1]]
+sunset = sunrise_set[[2]]
+class(sunrise)
+print(sunrise < sunset)
+format(sunrise)
 ```
 
 
