@@ -126,7 +126,9 @@ for(rhds in rh_dataset_names){
   sunrise <- sunrise_set[["sunrise"]]
   sunset <- sunrise_set[["sunset"]]
   
-  dsd %>% filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>% mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
+  dsd %>% 
+    filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
+    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
 #  , DAY_NIGHT = case_when(sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day", TRUE ~ "night")
   
   for(tcol in temperature_columns){
@@ -139,12 +141,17 @@ for(rhds in rh_dataset_names){
       depth <- -1
     }
     depth <- toString(depth)
-    dsd %>% group_by(YEAR, WOY) %>% summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% filter(!is.na(Q10))-> week_Q10[[paste(rhds, depth, sep="_")]]
+    dsd %>% 
+      group_by(YEAR, WOY) %>% 
+      summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% 
+      filter(!is.na(Q10))-> week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 week_Q10 <- bind_rows(week_Q10, .id = "ID")
-week_Q10[, c(4, 2:3, 5:8)] %>% arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
-print(week_Q10, n = 1156)
+week_Q10 %>% 
+  select(DATASET, YEAR:WOY, DEPTH:RESP) %>% 
+  arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
+print(week_Q10, n = 1000)
 ```
 
 ## Sunset/Sunrise Calculation Test
