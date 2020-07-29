@@ -11,6 +11,7 @@ library(cosore)
 library(dplyr)
 library(dplyr)
 library(ggplot2)
+library(lubridate)
 db_info <- csr_database()
 results <- list()
 ```
@@ -24,7 +25,7 @@ colnames(first_rh_data)
 # "CSR_PORT": port number
 # "CSR_TIMESTAMP_BEGIN": Begin time
 # "CSR_TIMESTAMP_END": end time
-# "CSR_FLUX": Rh flux
+# "CSR_FLUX_CO2": Rh flux
 # "CSR_R2": linear fitting R2
 # "CSR_SM30": Soil moisture           
 # "CSR_T5": Soil temperature
@@ -32,10 +33,10 @@ colnames(first_rh_data)
 # Check NA flux and T5
 # You can see that there are no missing Rh, but 43 T5 missing values
 first_rh_data %>% 
-  select(CSR_FLUX, CSR_T5) %>% 
+  select(CSR_FLUX_CO2, CSR_T5) %>% 
   mutate(
     RH_YN = case_when(
-      !is.na(CSR_FLUX)  ~ "YES",
+      !is.na(CSR_FLUX_CO2)  ~ "YES",
       TRUE ~ "NO"),
     T5_YN = case_when(
       !is.na(CSR_T5) ~ "YES",
@@ -45,7 +46,7 @@ first_rh_data %>%
 # because colname may differ in different dataset, it is better we rename the flux and T5 column
 # we also need to calculate the log(Rh) and we need to remove negative fluxes before log transform
 first_rh_data %>% 
-  rename('CSR_Rh' = 'CSR_FLUX',
+  rename('CSR_Rh' = 'CSR_FLUX_CO2',
          'CSR_TS' = 'CSR_T5') %>% 
   filter(CSR_Rh > 0 & !is.na(CSR_TS)) %>% 
   mutate(Rh_log = log(CSR_Rh)) ->

@@ -13,6 +13,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library(cosore)
 library(dplyr)
+library(lubridate)
 db_info <- csr_database()
 results <- list()
 ```
@@ -73,7 +74,7 @@ cat("The Q10 Value is", calc_q10(x,y))
 ```
 
 ## Ts Percentage
-```{r Ts Percentage, message = FALSE, warning=FALSE}
+```{r Ts Percentage, message = FALSE, warning=FALSE, eval = FALSE}
 main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -100,3 +101,42 @@ for(rhds in rh_dataset_names){
 main_results <- bind_rows(main_results, .id = "Dataset")
 print(main_results)
 ```
+
+## Q10 By Week
+```{r by week, message=FALSE, warning=FALSE}
+week_Q10 <- list()
+for(rhds in rh_dataset_names){
+  ds_data <- csr_dataset(rhds)
+  dsd <- ds_data$data
+  
+  column_names <- names(dsd)
+  temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
+  rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
+
+  dsd %>%
+    filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
+    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
+  
+  for(tcol in temperature_columns){
+    dsd$temp <- dsd[[tcol]]
+    depth <- gsub("^CSR_T", "", tcol)
+    #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
+    if(!is.na(as.numeric(depth))){
+      depth <- as.numeric(depth)
+    }else{
+      depth <- -1
+    }
+    depth <- toString(depth)
+    dsd %>% 
+      group_by(YEAR, WOY) %>% 
+      summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% 
+      filter(!is.na(Q10))-> week_Q10[[paste(rhds, depth, sep="_")]]
+  }
+}
+week_Q10 <- bind_rows(week_Q10, .id = "ID")
+week_Q10 %>% 
+  select(DATASET, YEAR:WOY, DEPTH:RESP) %>% 
+  arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
+print(week_Q10, n = 1000)
+```
+
