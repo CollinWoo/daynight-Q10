@@ -120,16 +120,23 @@ for(rhds in rh_dataset_names){
   date <- as.Date(dsd$CSR_TIMESTAMP_END)
   lon <- ds_desc$CSR_LONGITUDE
   lat <- ds_desc$CSR_LATITUDE
-  print(date[[1]])
-  sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"))
+  timezone <- attr(dsd$CSR_TIMESTAMP_END, "tzone")
+  
+  sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"), tz = timezone)
   #sunrise_set <- sunrise.set(lat, lon, date)
   sunrise <- sunrise_set[["sunrise"]]
   sunset <- sunrise_set[["sunset"]]
   
   dsd %>% 
+    mutate(DAY_NIGHT = case_when(
+      sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day",
+      TRUE ~ "night")) %>%
     filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
     mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
-#  , DAY_NIGHT = case_when(sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day", TRUE ~ "night")
+  
+  dsd$DAY_NIGHT <- as.factor(dsd$DAY_NIGHT)
+  print(is.factor(dsd$DAY_NIGHT))
+  print(levels(dsd$DAY_NIGHT))
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -142,14 +149,14 @@ for(rhds in rh_dataset_names){
     }
     depth <- toString(depth)
     dsd %>% 
-      group_by(YEAR, WOY) %>% 
+      group_by(YEAR, WOY, DAY_NIGHT) %>% 
       summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% 
       filter(!is.na(Q10))-> week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 week_Q10 <- bind_rows(week_Q10, .id = "ID")
 week_Q10 %>% 
-  select(DATASET, YEAR:WOY, DEPTH:RESP) %>% 
+  select(DATASET, YEAR:WOY, DAY_NIGHT, DEPTH:RESP) %>% 
   arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
 print(week_Q10, n = 1000)
 ```
