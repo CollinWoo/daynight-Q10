@@ -34,7 +34,7 @@ print(rh_dataset_names)
 -->
 
 ## Goal 2
-```{r Goal 2}
+```{r Goal 2, message = FALSE}
 results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -50,9 +50,12 @@ print(final_results)
 ## calc_q10 Function
 ```{r Q10 Function}
 calc_q10 <- function(temp, resp){
-  positives <- resp >= 0
+  positives <- resp > 0 & !is.na(temp) & !is.na(resp)
   resp <- resp[positives]
   temp <- temp[positives]
+  if(length(resp) < 4){
+    return(NA)
+  }
   lnresp <- log(resp)
   linReg <- lm(lnresp~temp)
   b <- linReg$coefficients[["temp"]]
@@ -69,3 +72,31 @@ plot(x,y)
 cat("The Q10 Value is", calc_q10(x,y))
 ```
 
+## Ts Percentage
+```{r Ts Percentage, message = FALSE, warning=FALSE}
+main_results <- list()
+for(rhds in rh_dataset_names){
+  ds_data <- csr_dataset(rhds)
+  dsd <- ds_data$data
+  column_names <- names(dsd)
+  temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
+  results <- data.frame(columns = temperature_columns, depth = NA, q10 = NA, n = NA)
+  resp <- dsd$CSR_FLUX_CO2
+  for(tcol in temperature_columns){
+    temp <- dsd[[tcol]]
+    results$q10[results$columns == tcol] = calc_q10(temp, resp)
+    results$n[results$columns == tcol] = length(temp[!is.na(temp) & !is.na(resp)])
+    depth <- gsub("^CSR_T", "", tcol)
+    #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
+    if(!is.na(as.numeric(depth))){
+      depth <- as.numeric(depth)
+    }else{
+      depth <- -1
+    }
+    results$depth[results$columns == tcol] = depth
+  }
+  main_results[[rhds]] <- results
+}
+main_results <- bind_rows(main_results, .id = "Dataset")
+print(main_results)
+```
