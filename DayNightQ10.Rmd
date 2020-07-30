@@ -105,7 +105,7 @@ main_results <- bind_rows(main_results, .id = "Dataset")
 print(main_results)
 ```
 
-## Q10 By Week
+## Q10 By Week and Day/Night
 ```{r by week, message=FALSE, warning=FALSE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
@@ -133,10 +133,7 @@ for(rhds in rh_dataset_names){
       TRUE ~ "night")) %>%
     filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
     mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
-  
   dsd$DAY_NIGHT <- as.factor(dsd$DAY_NIGHT)
-  print(is.factor(dsd$DAY_NIGHT))
-  print(levels(dsd$DAY_NIGHT))
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -162,7 +159,7 @@ print(week_Q10, n = 1000)
 ```
 
 ## Sunset/Sunrise Calculation Test
-```{r}
+```{r, eval=FALSE}
 #daytime <- function(lat, long, doy){
 #  lat <- NISTdegTOradian(lat)
 #  long <- NISTdegTOradian(long)
