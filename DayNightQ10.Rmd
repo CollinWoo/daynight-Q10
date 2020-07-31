@@ -14,7 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(cosore)
 library(dplyr)
 library(lubridate)
-library(StreamMetabolism)
+library(tidyverse)
+#library(StreamMetabolism)
 library(suncalc)
 #library(NISTunits)
 db_info <- csr_database()
@@ -132,8 +133,8 @@ for(rhds in rh_dataset_names){
       sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day",
       TRUE ~ "night")) %>%
     filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
-    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
-  dsd$DAY_NIGHT <- as.factor(dsd$DAY_NIGHT)
+    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END), DAY_NIGHT = as.factor(DAY_NIGHT)) -> dsd
+  
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -189,4 +190,8 @@ print(sunrise < sunset)
 format(sunrise)
 ```
 
+## Graphing Results
+```{r}
+ggplot(data = week_Q10, aes(x = DATASET)) + geom_bar(mapping = aes(fill = DAY_NIGHT)) + coord_flip()
+```
 
