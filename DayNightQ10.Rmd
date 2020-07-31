@@ -107,7 +107,7 @@ print(main_results)
 ```
 
 ## Q10 By Week and Day/Night
-```{r by week, message=FALSE, warning=FALSE}
+```{r by week, message=FALSE, warning=FALSE, cache = TRUE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -149,7 +149,8 @@ for(rhds in rh_dataset_names){
     dsd %>% 
       group_by(YEAR, WOY, DAY_NIGHT) %>% 
       summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% 
-      filter(!is.na(Q10))-> week_Q10[[paste(rhds, depth, sep="_")]]
+      filter(!is.na(Q10)) %>% 
+      mutate(DEPTH = factor(DEPTH))-> week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 week_Q10 <- bind_rows(week_Q10, .id = "ID")
@@ -192,6 +193,6 @@ format(sunrise)
 
 ## Graphing Results
 ```{r}
-ggplot(data = week_Q10, aes(x = DATASET)) + geom_bar(mapping = aes(fill = DAY_NIGHT)) + coord_flip()
+ggplot(data = week_Q10, aes(x = DEPTH)) + geom_bar(mapping = aes(fill = DATASET)) + coord_flip()
 ```
 
