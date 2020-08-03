@@ -14,6 +14,10 @@ knitr::opts_chunk$set(echo = TRUE)
 library(cosore)
 library(dplyr)
 library(lubridate)
+library(tidyverse)
+#library(StreamMetabolism)
+library(suncalc)
+#library(NISTunits)
 db_info <- csr_database()
 results <- list()
 ```
@@ -74,7 +78,7 @@ cat("The Q10 Value is", calc_q10(x,y))
 ```
 
 ## Ts Percentage
-```{r Ts Percentage, message = FALSE, warning=FALSE, eval = FALSE}
+```{r Ts Percentage, message = FALSE, warning=FALSE}
 main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -102,20 +106,35 @@ main_results <- bind_rows(main_results, .id = "Dataset")
 print(main_results)
 ```
 
-## Q10 By Week
-```{r by week, message=FALSE, warning=FALSE}
+## Q10 By Week and Day/Night
+```{r by week, message=FALSE, warning=FALSE, cache = TRUE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
+  ds_desc <- ds_data$description
   
   column_names <- names(dsd)
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
-
-  dsd %>%
+  
+  date <- as.Date(dsd$CSR_TIMESTAMP_END)
+  lon <- ds_desc$CSR_LONGITUDE
+  lat <- ds_desc$CSR_LATITUDE
+  timezone <- attr(dsd$CSR_TIMESTAMP_END, "tzone")
+  
+  sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"), tz = timezone)
+  #sunrise_set <- sunrise.set(lat, lon, date)
+  sunrise <- sunrise_set[["sunrise"]]
+  sunset <- sunrise_set[["sunset"]]
+  
+  dsd %>% 
+    mutate(DAY_NIGHT = case_when(
+      sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day",
+      TRUE ~ "night")) %>%
     filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
-    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END)) -> dsd
+    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END), DAY_NIGHT = as.factor(DAY_NIGHT)) -> dsd
+  
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -128,15 +147,52 @@ for(rhds in rh_dataset_names){
     }
     depth <- toString(depth)
     dsd %>% 
-      group_by(YEAR, WOY) %>% 
+      group_by(YEAR, WOY, DAY_NIGHT) %>% 
       summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% 
-      filter(!is.na(Q10))-> week_Q10[[paste(rhds, depth, sep="_")]]
+      filter(!is.na(Q10)) %>% 
+      mutate(DEPTH = factor(DEPTH))-> week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 week_Q10 <- bind_rows(week_Q10, .id = "ID")
 week_Q10 %>% 
-  select(DATASET, YEAR:WOY, DEPTH:RESP) %>% 
+  select(DATASET, YEAR:WOY, DAY_NIGHT, DEPTH:RESP) %>% 
   arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
 print(week_Q10, n = 1000)
+```
+
+## Sunset/Sunrise Calculation Test
+```{r, eval=FALSE}
+#daytime <- function(lat, long, doy){
+#  lat <- NISTdegTOradian(lat)
+#  long <- NISTdegTOradian(long)
+#  frac_yr = 2 * pi/365 * (doy - 1 + (hr-12)/24)
+#  eqtime = 229.18*(0.000075+0.001868*cos(frac_yr)-0.032077*sin(frac_yr)-0.014615*cos(2*frac_yr)-0.040849*sin(2*frac_yr))
+#  decl =  0.006918-0.399912*cos(frac_yr)+0.070257*sin(frac_yr)-0.006758*cos(2*frac_yr)+0.000907*sin(2*frac_yr)-0.002697*cos(3*frac_yr)+0.00148*sin(3*frac_yr)
+#  ha = acos(cos(NISTdegTOradian(90.833))/(cos(lat)*cos(decl))-tan(lat)*tan(decl))
+#  sunrise=720-4*(long+ha)-eqtime
+#  sunset=720-4*(long-ha)-eqtime
+#}
+lat <- 39.110940
+lon <- -77.171990
+date <- "2020/07/29"
+date2 <- as.Date(date)
+timez = Sys.timezone()
+sunrise_set = sunrise.set(lat, lon, date2 + 1, timezone=timez)
+print(sunrise_set)
+sunset_rise = getSunlightTimes(date2, lat, lon, keep = c("sunrise", "sunset"), tz = timez)
+print(sunset_rise)
+print(sunset_rise[["sunrise"]])
+print(sunset_rise[["sunset"]])
+print(sunrise_set)
+sunrise = sunrise_set[[1]]
+sunset = sunrise_set[[2]]
+class(sunrise)
+print(sunrise < sunset)
+format(sunrise)
+```
+
+## Graphing Results
+```{r}
+ggplot(data = week_Q10, aes(x = DEPTH)) + geom_bar(mapping = aes(fill = DATASET)) + coord_flip()
 ```
 
