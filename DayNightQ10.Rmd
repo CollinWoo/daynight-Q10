@@ -149,15 +149,14 @@ for(rhds in rh_dataset_names){
     } else {
       depth <- -1
     }
-    depth <- toString(depth)
     dsd %>% 
       group_by(YEAR, WOY, DAY_NIGHT) %>% 
-      summarize(DATASET = rhds, DEPTH = depth, 
+      summarize(DATASET = rhds, 
+                DEPTH = depth, 
                 Q10 = calc_q10(temp, CSR_FLUX_CO2), 
                 TEMP = mean(temp, na.rm=TRUE), 
                 RESP = mean(CSR_FLUX_CO2)) %>% 
-      filter(!is.na(Q10)) %>% 
-      mutate(DEPTH = factor(DEPTH))-> 
+      filter(!is.na(Q10)) -> 
       week_Q10[[paste(rhds, depth, sep = "_")]]
   }
 }
