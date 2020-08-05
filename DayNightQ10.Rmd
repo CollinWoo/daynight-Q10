@@ -11,13 +11,14 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(cosore)
 library(dplyr)
 library(lubridate)
-library(tidyverse)
+library(ggplot2)
 #library(StreamMetabolism)
 library(suncalc)
 #library(NISTunits)
+
+library(cosore)
 db_info <- csr_database()
 results <- list()
 ```
@@ -67,8 +68,8 @@ calc_q10 <- function(temp, resp){
   q10 <- exp(10*b)
   return(q10)
 }
-
 ```
+
 ```{r Q10 Function Test}
 set.seed(2020)
 x <- 1:20
@@ -132,31 +133,35 @@ for(rhds in rh_dataset_names){
     mutate(DAY_NIGHT = case_when(
       sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day",
       TRUE ~ "night")) %>%
-    filter(CSR_PORT %in% rh_ports & !is.na(CSR_FLUX_CO2) & CSR_FLUX_CO2 > 0) %>%
-    mutate(WOY = week(CSR_TIMESTAMP_END), YEAR = year(CSR_TIMESTAMP_END), DAY_NIGHT = as.factor(DAY_NIGHT)) -> dsd
-  
+    filter(CSR_PORT %in% rh_ports, !is.na(CSR_FLUX_CO2), CSR_FLUX_CO2 > 0) %>%
+    mutate(WOY = week(CSR_TIMESTAMP_END), 
+           YEAR = year(CSR_TIMESTAMP_END)) -> 
+    dsd
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
     depth <- gsub("^CSR_T", "", tcol)
-    #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
+    # Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
     if(!is.na(as.numeric(depth))){
       depth <- as.numeric(depth)
-    }else{
+    } else {
       depth <- -1
     }
-    depth <- toString(depth)
     dsd %>% 
       group_by(YEAR, WOY, DAY_NIGHT) %>% 
-      summarize(DATASET = rhds, DEPTH = depth, Q10 = calc_q10(temp, CSR_FLUX_CO2), TEMP = mean(temp, na.rm=TRUE), RESP = mean(CSR_FLUX_CO2)) %>% 
-      filter(!is.na(Q10)) %>% 
-      mutate(DEPTH = factor(DEPTH))-> week_Q10[[paste(rhds, depth, sep="_")]]
+      summarize(DATASET = rhds, 
+                DEPTH = depth, 
+                Q10 = calc_q10(temp, CSR_FLUX_CO2), 
+                TEMP = mean(temp, na.rm = TRUE), 
+                RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
+                N = n()) -> 
+      week_Q10[[paste(rhds, depth, sep = "_")]]
   }
 }
-week_Q10 <- bind_rows(week_Q10, .id = "ID")
-week_Q10 %>% 
-  select(DATASET, YEAR:WOY, DAY_NIGHT, DEPTH:RESP) %>% 
-  arrange(DATASET, DEPTH, YEAR, WOY) -> week_Q10
+bind_rows(week_Q10, .id = "ID") %>% 
+  filter(!is.na(Q10), is.finite(Q10)) %>% 
+  arrange(DATASET, DEPTH, YEAR, WOY) -> 
+  week_Q10
 print(week_Q10, n = 1000)
 ```
 
@@ -192,7 +197,11 @@ format(sunrise)
 ```
 
 ## Graphing Results
-```{r}
-ggplot(data = week_Q10, aes(x = DEPTH)) + geom_bar(mapping = aes(fill = DATASET)) + coord_flip()
+```{r, fig.height=6}
+p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + 
+  geom_line(na.rm = TRUE) +
+  ylim(c(0, 5)) + 
+  facet_wrap(~ID+DEPTH)
+print(p)
 ```
 
