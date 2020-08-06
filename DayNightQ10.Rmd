@@ -83,7 +83,7 @@ calc_q10 <- function(temp, resp){
     r_squared <- sumReg$r.squared
     p_val <- lmp(linReg)
   }
-  return_val <- c(q10, r_squared, p_val)
+  return_val <- data.frame(Q10 = q10, R_SQUARED = r_squared, P_VALUE = p_val)
   return(return_val)
 }
 ```
@@ -93,7 +93,7 @@ set.seed(2020)
 x <- 1:20
 y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
 plot(x,y)
-cat("The Q10 Value is", calc_q10(x,y)[1])
+cat("The Q10 Value is", calc_q10(x,y)[,1])
 ```
 
 ## Ts Percentage
@@ -108,7 +108,7 @@ for(rhds in rh_dataset_names){
   resp <- dsd$CSR_FLUX_CO2
   for(tcol in temperature_columns){
     temp <- dsd[[tcol]]
-    results$q10[results$columns == tcol] = calc_q10(temp, resp)[1]
+    results$q10[results$columns == tcol] = calc_q10(temp, resp)[,1]
     results$n[results$columns == tcol] = length(temp[!is.na(temp) & !is.na(resp)])
     depth <- gsub("^CSR_T", "", tcol)
     #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
@@ -174,13 +174,12 @@ for(rhds in rh_dataset_names){
       group_by(YEAR, WOY, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
-                Q10 = calc_q10(temp, CSR_FLUX_CO2)[1],
-                R_SQUARED = calc_q10(temp, CSR_FLUX_CO2)[2],
-                P_VALUE = calc_q10(temp, CSR_FLUX_CO2)[3],
+                Q10 = calc_q10(temp, CSR_FLUX_CO2),
                 TEMP = mean(temp, na.rm=TRUE), 
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
-                N = n()) -> 
-        week_Q10[[paste(rhds, depth, sep="_")]]
+                N = n()) %>% 
+      unpack(cols = Q10) -> 
+      week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 bind_rows(week_Q10, .id = "ID") %>% 
