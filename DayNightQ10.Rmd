@@ -54,6 +54,16 @@ print(final_results)
 ```
 
 ## calc_q10 Function
+```{r p-value function from https://gettinggeneticsdone.blogspot.com/2011/01/rstats-function-for-extracting-f-test-p.html}
+lmp <- function (modelobject) {
+	if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+	f <- summary(modelobject)$fstatistic
+	p <- pf(f[1],f[2],f[3],lower.tail=F)
+	attributes(p) <- NULL
+	return(p)
+}
+```
+
 ```{r Q10 Function}
 calc_q10 <- function(temp, resp){
   positives <- resp > 0 & !is.na(temp) & !is.na(resp)
@@ -64,9 +74,17 @@ calc_q10 <- function(temp, resp){
   }
   lnresp <- log(resp)
   linReg <- lm(lnresp~temp)
+  sumReg <- summary(linReg)
   b <- linReg$coefficients[["temp"]]
   q10 <- exp(10*b)
-  return(q10)
+  r_squared = NA
+  p_val = NA
+  if(!is.infinite(q10) & !is.na(q10)){
+    r_squared <- sumReg$r.squared
+    p_val <- lmp(linReg)
+  }
+  return_val <- c(q10, r_squared, p_val)
+  return(return_val)
 }
 ```
 
@@ -75,7 +93,7 @@ set.seed(2020)
 x <- 1:20
 y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
 plot(x,y)
-cat("The Q10 Value is", calc_q10(x,y))
+cat("The Q10 Value is", calc_q10(x,y)[1])
 ```
 
 ## Ts Percentage
@@ -90,7 +108,7 @@ for(rhds in rh_dataset_names){
   resp <- dsd$CSR_FLUX_CO2
   for(tcol in temperature_columns){
     temp <- dsd[[tcol]]
-    results$q10[results$columns == tcol] = calc_q10(temp, resp)
+    results$q10[results$columns == tcol] = calc_q10(temp, resp)[1]
     results$n[results$columns == tcol] = length(temp[!is.na(temp) & !is.na(resp)])
     depth <- gsub("^CSR_T", "", tcol)
     #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
@@ -156,7 +174,9 @@ for(rhds in rh_dataset_names){
       group_by(YEAR, WOY, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
-                Q10 = calc_q10(temp, CSR_FLUX_CO2),
+                Q10 = calc_q10(temp, CSR_FLUX_CO2)[1],
+                R_SQUARED = calc_q10(temp, CSR_FLUX_CO2)[2],
+                P_VALUE = calc_q10(temp, CSR_FLUX_CO2)[3],
                 TEMP = mean(temp, na.rm=TRUE), 
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
                 N = n()) -> 
@@ -170,6 +190,7 @@ bind_rows(week_Q10, .id = "ID") %>%
   week_Q10
 
 print(week_Q10, n = 1000)
+summary(week_Q10)
 ```
 
 ## Sunset/Sunrise Calculation Test
