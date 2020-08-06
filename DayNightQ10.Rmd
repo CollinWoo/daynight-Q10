@@ -132,10 +132,13 @@ for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
   ds_desc <- ds_data$description
+  ds_ports <- ds_data$ports
   
   column_names <- names(dsd)
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
+  rs_ports <- ds_ports[ds_ports$CSR_MSMT_VAR == "Rs",][[1]]
+  print(rs_ports)
   
   date <- as.Date(dsd$CSR_TIMESTAMP_END)
   lon <- ds_desc$CSR_LONGITUDE
@@ -153,8 +156,9 @@ for(rhds in rh_dataset_names){
       TRUE ~ "night"), 
       Rs_Rh = case_when(
         CSR_PORT %in% rh_ports ~ "Rh", 
-        TRUE ~ "Rs")) %>%
-    filter(!is.na(CSR_FLUX_CO2), CSR_FLUX_CO2 > 0) %>%
+        CSR_PORT %in% rs_ports ~ "Rs",
+        TRUE ~ "other")) %>%
+    filter(!is.na(CSR_FLUX_CO2), CSR_FLUX_CO2 > 0, Rs_Rh != "other") %>%
     mutate(WOY = week(CSR_TIMESTAMP_END),
            YEAR = year(CSR_TIMESTAMP_END), 
            DAY_NIGHT = factor(DAY_NIGHT),
