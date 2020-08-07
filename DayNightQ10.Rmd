@@ -235,4 +235,8 @@ p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_N
   facet_wrap(~ID+DEPTH)
 print(p)
 ```
+```{r}
+a <- ggplot(week_Q10, aes(x = R_SQUARED)) + geom_histogram()
+print(a)
+```
 
