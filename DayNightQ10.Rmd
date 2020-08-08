@@ -193,7 +193,7 @@ bind_rows(week_Q10, .id = "ID") %>%
   arrange(DATASET, DEPTH, YEAR, MONTH) -> 
   week_Q10
 
-print(week_Q10, n = 1000)
+print(week_Q10)
 summary(week_Q10)
 ```
 
@@ -236,8 +236,18 @@ p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_N
   facet_wrap(~ID+DEPTH)
 print(p)
 ```
-```{r}
-a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram()
+```{r, message=FALSE, warning=FALSE}
+a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white")
+a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 5)
+b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram() + facet_wrap(~DATASET)
+c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram() + xlim(0, 5) + facet_wrap(~DATASET)
+d <- ggplot(week_Q10, aes(x = MONTH, y = DATASET, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
+d2 <- ggplot(week_Q10, aes(x = MONTH, y = YEAR, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
 print(a)
+print(a2)
+print(b)
+print(c)
+print(d)
+print(d2)
 ```
 
