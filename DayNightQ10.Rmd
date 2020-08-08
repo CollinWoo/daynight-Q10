@@ -12,6 +12,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
+library(tidyr)
 library(lubridate)
 library(ggplot2)
 #library(StreamMetabolism)
@@ -83,7 +84,7 @@ calc_q10 <- function(temp, resp){
     r_squared <- sumReg$r.squared
     p_val <- lmp(linReg)
   }
-  return_val <- data.frame(Q10 = q10, R_SQUARED = r_squared, P_VALUE = p_val)
+  return_val <- data.frame(Q10 = q10, R2 = r_squared, P_VALUE = p_val)
   return(return_val)
 }
 ```
@@ -126,7 +127,7 @@ print(main_results)
 ```
 
 ## Q10 By Week and Day/Night
-```{r by week, message=FALSE, warning=FALSE, cache = TRUE}
+```{r by week, message=FALSE, warning=FALSE, cache = FALSE}
 week_Q10 <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -138,7 +139,6 @@ for(rhds in rh_dataset_names){
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
   rs_ports <- ds_ports[ds_ports$CSR_MSMT_VAR == "Rs",][[1]]
-  print(rs_ports)
   
   date <- as.Date(dsd$CSR_TIMESTAMP_END)
   lon <- ds_desc$CSR_LONGITUDE
@@ -160,7 +160,8 @@ for(rhds in rh_dataset_names){
         TRUE ~ "other")) %>%
     filter(!is.na(CSR_FLUX_CO2), CSR_FLUX_CO2 > 0, Rs_Rh != "other") %>%
     mutate(WOY = week(CSR_TIMESTAMP_END),
-           YEAR = year(CSR_TIMESTAMP_END), 
+           MONTH = month(CSR_TIMESTAMP_END),
+           YEAR = year(CSR_TIMESTAMP_END),
            DAY_NIGHT = factor(DAY_NIGHT),
            Rs_Rh = factor(Rs_Rh)) ->
     dsd
@@ -175,7 +176,7 @@ for(rhds in rh_dataset_names){
       depth <- -1
     }
     dsd %>% 
-      group_by(YEAR, WOY, DAY_NIGHT, Rs_Rh) %>% 
+      group_by(YEAR, MONTH, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
                 Q10 = calc_q10(temp, CSR_FLUX_CO2),
@@ -188,8 +189,8 @@ for(rhds in rh_dataset_names){
 }
 bind_rows(week_Q10, .id = "ID") %>% 
   filter(!is.na(Q10), is.finite(Q10)) %>% 
-  select(DATASET, YEAR:WOY, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
-  arrange(DATASET, DEPTH, YEAR, WOY) -> 
+  select(DATASET, YEAR:MONTH, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
+  arrange(DATASET, DEPTH, YEAR, MONTH) -> 
   week_Q10
 
 print(week_Q10, n = 1000)
@@ -236,7 +237,7 @@ p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_N
 print(p)
 ```
 ```{r}
-a <- ggplot(week_Q10, aes(x = R_SQUARED)) + geom_histogram()
+a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram()
 print(a)
 ```
 
