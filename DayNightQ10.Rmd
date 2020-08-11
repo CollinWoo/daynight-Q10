@@ -15,9 +15,14 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 library(ggplot2)
-#library(StreamMetabolism)
 library(suncalc)
+library(raster)
+#library(StreamMetabolism)
 #library(NISTunits)
+
+#Download worldclim data for precip and tmean if necessary, into w10/ folder
+precip <- getData("worldclim", path = here::here(), var = "prec", res = 10, download = !file.exists("wc10/prec1.hdr"))
+tmean <- getData("worldclim", path = here::here(), var = "tmean", res = 10, download = !file.exists("wc10/tmean1.hdr"))
 
 library(cosore)
 db_info <- csr_database()
@@ -129,6 +134,7 @@ print(main_results)
 ## Q10 By Week and Day/Night
 ```{r by week, message=FALSE, warning=FALSE, cache = FALSE}
 week_Q10 <- list()
+MA_set <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
@@ -149,6 +155,18 @@ for(rhds in rh_dataset_names){
   #sunrise_set <- sunrise.set(lat, lon, date)
   sunrise <- sunrise_set[["sunrise"]]
   sunset <- sunrise_set[["sunset"]]
+  
+  MA_row <- data.frame(Latitude = lat, Longitude = lon)
+  
+  # MAP data that matches the srdb coordinates
+  raster::extract(precip, MA_row[1:2]) -> precip_coords
+  apply(precip_coords, 1, sum) -> MA_row$MAP
+  
+  # The same for MAT
+  raster::extract(tmean, MA_row[1:2]) -> tmean_vals
+  apply(tmean_vals, 1, mean) -> MA_row$MAT
+  
+  MA_set[[rhds]] <- MA_row
   
   dsd %>% 
     mutate(DAY_NIGHT = case_when(
@@ -193,8 +211,10 @@ bind_rows(week_Q10, .id = "ID") %>%
   arrange(DATASET, DEPTH, YEAR, MONTH) -> 
   week_Q10
 
+MA_set <- bind_rows(MA_set, .id = "DATASET")
 print(week_Q10)
 summary(week_Q10)
+print(MA_set)
 ```
 
 ## Sunset/Sunrise Calculation Test
@@ -239,8 +259,8 @@ print(p)
 ```{r, message=FALSE, warning=FALSE}
 a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white")
 a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 5)
-b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram() + facet_wrap(~DATASET)
-c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram() + xlim(0, 5) + facet_wrap(~DATASET)
+b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram() + facet_wrap(~DATASET+DAY_NIGHT)
+c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram() + xlim(0, 5) + facet_wrap(~DATASET+DAY_NIGHT)
 d <- ggplot(week_Q10, aes(x = MONTH, y = DATASET, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
 d2 <- ggplot(week_Q10, aes(x = MONTH, y = YEAR, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
 print(a)
@@ -249,5 +269,21 @@ print(b)
 print(c)
 print(d)
 print(d2)
+print(ggplot(week_Q10, aes(MONTH, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_line() + ylim(0,5) + facet_wrap(~DATASET+DEPTH+Rs_Rh))
 ```
 
+<!-- 
+precip <- getData("worldclim", path = here::here(), var = "prec", res = 10, download = !file.exists("wc10/prec1.hdr"))
+tmean <- getData("worldclim", path = here::here(), var = "tmean", res = 10, download = !file.exists("wc10/wc10/tmean1.hdr"))
+# Pull out cosore dataset latitudes and longitudes
+srdb %>%
+  dplyr::select(Site_ID, Longitude, Latitude) -> srdb_coords
+# MAP data that matches the srdb coordinates
+raster::extract(precip, srdb_coords[2:3]) -> precip_coords
+apply(precip_coords, 1, sum) -> MAP
+# The same for MAT
+raster::extract(tmean, srdb_coords[2:3]) -> tmean_vals
+apply(tmean_vals, 1, mean) -> MAT
+# Temp data is stored in degC * 10, so we need to divide to get back to degC
+MAT <- MAT/10
+-->
