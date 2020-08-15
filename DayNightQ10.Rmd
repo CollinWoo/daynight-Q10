@@ -78,9 +78,19 @@ calc_q10 <- function(temp, resp){
   positives <- resp > 0 & !is.na(temp) & !is.na(resp)
   resp <- resp[positives]
   temp <- temp[positives]
+  
+  resp_outliers <- which(resp %in% boxplot(resp, plot=FALSE)$out)
+  temp_outliers <- which(temp %in% boxplot(temp, plot=FALSE)$out)
+  all_outliers <- unique(c(resp_outliers, temp_outliers))
+  
+  if(length(all_outliers) > 0L){
+    temp <- as.vector(temp[-resp_outliers])
+    resp <- as.vector(resp[-resp_outliers])
+  }
   if(length(resp) < 4){
     return(NA)
   }
+  
   lnresp <- log(resp)
   linReg <- lm(lnresp~temp)
   sumReg <- summary(linReg)
@@ -135,7 +145,7 @@ print(main_results)
 ```
 
 ## Q10 By Week and Day/Night
-```{r by week, message=FALSE, warning=FALSE, cache = TRUE}
+```{r by week, message=FALSE, warning=FALSE}
 week_Q10 <- list()
 MA_set <- list()
 for(rhds in rh_dataset_names){
@@ -275,9 +285,9 @@ b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram() + facet_wr
 ggsave("R2 By Dataset.png", b)
 c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram() + xlim(0, 5) + facet_wrap(~DATASET) + labs(title = "Q10 By Dataset")
 ggsave("Q10 By Dataset.png", c)
-d <- ggplot(week_Q10, aes(x = MONTH, y = DATASET, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
+d <- ggplot(week_Q10, aes(x = MONTH, y = DATASET, fill = Q10)) + geom_tile() + lims(fill = c(0, 5)) + facet_wrap(~YEAR)
 ggsave("tile1.png", d)
-d2 <- ggplot(week_Q10, aes(x = MONTH, y = YEAR, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
+d2 <- ggplot(week_Q10, aes(x = MONTH, y = YEAR, fill = Q10)) + geom_tile() + lims(fill = c(0, 5)) + facet_wrap(~DATASET)
 ggsave("tile2.png", d2)
 print(a)
 print(a2)
@@ -285,14 +295,25 @@ print(b)
 print(c)
 print(d)
 print(d2)
-print(ggplot(week_Q10 %>% filter(Rs_Rh == "Rs", DEPTH == 5), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = "Rs Variation by Day/Night"))
+```
 
-print(ggplot(week_Q10 %>% filter(Rs_Rh == "Rh", DEPTH == 5), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,5) + facet_wrap(~DATASET+DEPTH, scales = "free_x") + labs(title = "Rh Variation by Day/Night") + 
+## Rs and Rh Day/Night Variation
+```{r, warning=FALSE}
+Rs_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rs"]))
+Rh_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rh"]))
+Shared_depths_list <- intersect(Rs_depths_list, Rh_depths_list)
+for(depth in Shared_depths_list){
+  Rs_table <- week_Q10 %>% filter(Rs_Rh == "Rs", DEPTH == as.numeric(depth))
+  print(ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rs Variation by Day/Night at depth", depth)))
+print(ggplot(week_Q10 %>% filter(Rs_Rh == "Rh", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rh Variation by Day/Night at depth", depth)) + 
 theme(
   strip.background = element_blank(),
-  strip.text.x = element_blank()
+  strip.text.x = element_text(size = 10)
 ))
+  }
+```
 
+```{r}
 print(ggplot(week_Q10 %>% filter(DAY_NIGHT == "day"), aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_line() + ylim(0,5) + facet_wrap(~DATASET+DEPTH, scales = "free_x") + labs(title = "Day Variation by Rs/Rh"))
 
 print(ggplot(week_Q10, aes(MAT, MAP, color = Q10)) + geom_point(position = "jitter") + lims(color = c(0, 5)))
@@ -300,7 +321,10 @@ print(ggplot(week_Q10, aes(MAT, MAP, color = Q10)) + geom_point(position = "jitt
 ```{r Site Map}
 coord_table <- db_info %>% filter(CSR_DATASET %in% rh_dataset_names) %>% dplyr::select(CSR_DATASET, CSR_LONGITUDE, CSR_LATITUDE)
 coordinates(coord_table) <- ~CSR_LONGITUDE + CSR_LATITUDE
+coordinates(db_info) <- ~CSR_LONGITUDE + CSR_LATITUDE
 lflt <- addMarkers(leaflet(coord_table), label = coord_table$CSR_DATASET)
+addTiles(lflt)
+lflt <- addMarkers(leaflet(db_info), label = db_info$CSR_DATASET)
 addTiles(lflt)
 ```
 
