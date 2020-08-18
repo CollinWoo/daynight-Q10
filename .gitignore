@@ -7,3 +7,6 @@
 html/
 cache/
 figure-html/
+
+# Worldclim data
+wc10/
