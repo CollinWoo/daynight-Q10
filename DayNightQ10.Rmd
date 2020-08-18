@@ -10,15 +10,13 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyr)
 library(lubridate)
 library(ggplot2)
 library(suncalc)
 library(raster)
-library(zoo)
-library(leaflet)
 #library(StreamMetabolism)
 #library(NISTunits)
 
@@ -49,7 +47,7 @@ print(rh_dataset_names)
 -->
 
 ## Goal 2
-```{r Goal 2}
+```{r Goal 2, message = FALSE}
 results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -74,23 +72,13 @@ lmp <- function (modelobject) {
 ```
 
 ```{r Q10 Function}
-calc_q10 <- function(temp, resp, out.rm = TRUE){
+calc_q10 <- function(temp, resp){
   positives <- resp > 0 & !is.na(temp) & !is.na(resp)
   resp <- resp[positives]
   temp <- temp[positives]
-  
-  resp_outliers <- which(resp %in% boxplot(resp, plot=FALSE)$out)
-  temp_outliers <- which(temp %in% boxplot(temp, plot=FALSE)$out)
-  all_outliers <- unique(c(resp_outliers, temp_outliers))
-  
-  if(length(all_outliers) > 0L & out.rm){
-    temp <- as.vector(temp[-resp_outliers])
-    resp <- as.vector(resp[-resp_outliers])
-  }
   if(length(resp) < 4){
     return(NA)
   }
-  
   lnresp <- log(resp)
   linReg <- lm(lnresp~temp)
   sumReg <- summary(linReg)
@@ -116,7 +104,7 @@ cat("The Q10 Value is", calc_q10(x,y)[,1])
 ```
 
 ## Ts Percentage
-```{r Ts Percentage}
+```{r Ts Percentage, message = FALSE, warning=FALSE}
 main_results <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -145,7 +133,7 @@ print(main_results)
 ```
 
 ## Q10 By Week and Day/Night
-```{r by week}
+```{r by week, message=FALSE, warning=FALSE, cache = FALSE}
 week_Q10 <- list()
 MA_set <- list()
 for(rhds in rh_dataset_names){
@@ -178,7 +166,7 @@ for(rhds in rh_dataset_names){
   raster::extract(tmean, MA_row[1:2]) -> tmean_vals
   apply(tmean_vals, 1, mean)/10 -> MA_row$MAT
   
-  #MA_row <- cbind.data.frame(MA_row, raster::extract(bio, MA_row[1:2]))
+  MA_row <- cbind.data.frame(MA_row, raster::extract(bio, MA_row[1:2]))
   MA_set[[rhds]] <- MA_row
   
   dsd %>% 
@@ -210,27 +198,21 @@ for(rhds in rh_dataset_names){
       group_by(YEAR, MONTH, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
-                Q10 = calc_q10(temp, CSR_FLUX_CO2, out.rm = TRUE),
+                Q10 = calc_q10(temp, CSR_FLUX_CO2),
                 TEMP = mean(temp, na.rm=TRUE), 
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
                 N = n()) %>% 
-      unpack(cols = Q10) %>%
-      mutate(MON_YEAR = paste(YEAR, MONTH, 15, sep = "/"), MON_YEAR = as.Date(MON_YEAR)) -> 
+      unpack(cols = Q10) -> 
       week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
-#as.yearmon(paste(YEAR, MONTH), "%Y %m")
-#paste(YEAR, MONTH, 1, sep = "/")
-MA_set <- bind_rows(MA_set, .id = "DATASET")
-
 bind_rows(week_Q10, .id = "ID") %>% 
   filter(!is.na(Q10), is.finite(Q10)) %>% 
-  dplyr::select(DATASET, YEAR:MONTH, MON_YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
-  arrange(DATASET, DEPTH, YEAR, MONTH) %>%
-  left_join(MA_set, by = "DATASET") -> 
+  dplyr::select(DATASET, YEAR:MONTH, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
+  arrange(DATASET, DEPTH, YEAR, MONTH) -> 
   week_Q10
 
-
+MA_set <- bind_rows(MA_set, .id = "DATASET")
 
 print(week_Q10)
 summary(week_Q10)
@@ -268,7 +250,7 @@ print(sunrise < sunset)
 format(sunrise)
 ```
 
-## Graphing Results {.tabset}
+## Graphing Results
 ```{r, fig.height=6, eval = FALSE}
 p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + 
   geom_line(na.rm = TRUE) +
@@ -276,102 +258,18 @@ p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_N
   facet_wrap(~ID+DEPTH)
 print(p)
 ```
-
-### Distributions
-```{r Distr}
-a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white") + labs(title = "R2 Distribution")
-ggsave("R2 Distribution.png", a)
-a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 5) + labs(title = "Q10 Distribution")
-ggsave("Q10 Distribution.png", a2)
-b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram() + facet_wrap(~DATASET) + labs(title = "R2 By Dataset")
-ggsave("R2 By Dataset.png", b)
-c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram() + xlim(0, 5) + facet_wrap(~DATASET) + labs(title = "Q10 By Dataset")
-ggsave("Q10 By Dataset.png", c)
-
+```{r, message=FALSE, warning=FALSE}
+a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white")
+a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 5)
+b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram() + facet_wrap(~DATASET)
+c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram() + xlim(0, 5) + facet_wrap(~DATASET)
+d <- ggplot(week_Q10, aes(x = MONTH, y = DATASET, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
+d2 <- ggplot(week_Q10, aes(x = MONTH, y = YEAR, fill = Q10)) + geom_tile() + lims(fill = c(0, 5))
 print(a)
 print(a2)
 print(b)
 print(c)
-```
-
-### Tiles
-```{r tiles}
-week_Q10 %>% group_by(DATASET, MONTH) %>%
-  summarize(Q10 = mean(Q10)) %>% 
-  left_join(MA_set, by = "DATASET") -> 
-  month_Q10
-
-week_Q10 %>% group_by(MONTH, YEAR) %>%
-  summarize(Q10 = mean(Q10)) -> 
-  monthyear_Q10
-
-d <- ggplot(month_Q10, aes(x = MONTH, y = DATASET, fill = Q10)) + geom_tile() + lims(fill = c(0, 6))
-ggsave("tile1.png", d)
-d2 <- ggplot(monthyear_Q10, aes(x = MONTH, y = YEAR, fill = Q10)) + geom_tile() + lims(fill = c(0, 6))
-ggsave("tile2.png", d2)
 print(d)
 print(d2)
+print(ggplot(week_Q10, aes(MONTH, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_line() + ylim(0,5) + facet_wrap(~DATASET+DEPTH+Rs_Rh))
 ```
-
-### Rs and Rh Day/Night Variation
-```{r, fig.width=10}
-Rs_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rs"]))
-Rh_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rh"]))
-Shared_depths_list <- intersect(Rs_depths_list, Rh_depths_list)
-for(depth in Shared_depths_list){
-  Rs_table <- week_Q10 %>% filter(Rs_Rh == "Rs", DEPTH == as.numeric(depth))
-  #print(ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rs Variation by Day/Night at depth", depth)))
-#print(ggplot(week_Q10 %>% filter(Rs_Rh == "Rh", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rh Variation by Day/Night at depth", depth)) + theme(
-#  strip.background = element_blank(),
-#  strip.text.x = element_text(size = 10)
-#))
-print(ggplot(week_Q10 %>% filter(DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_grid(Rs_Rh~DATASET, scales = "free_x") + labs(title = paste("Rh and Rs Variation by Day/Night at depth", depth)) + 
-theme(
-  strip.background = element_blank(),
-  strip.text.x = element_text(size = 10)
-))
-  }
-```
-
-### Day and Night Variation by Rs/Rh
-```{r, warning=FALSE, fig.width=10}
-for(depth in Shared_depths_list){
-  Rs_table <- week_Q10 %>% filter(DAY_NIGHT == "day", DEPTH == as.numeric(depth))
-  print(ggplot(Rs_table, aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Day Variation by Rs/Rh at depth", depth)))
-print(ggplot(week_Q10 %>% filter(DAY_NIGHT == "night", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Night Variation by Rs/Rh at depth", depth)) + 
-theme(
-  strip.background = element_blank(),
-  strip.text.x = element_text(size = 10)
-))
-print(ggplot(week_Q10 %>% filter(DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_grid(DAY_NIGHT~DATASET, scales = "free_x") + labs(title = paste("Day and Night Variation by Rs/Rh at depth", depth)) + 
-theme(
-  strip.background = element_blank(),
-  strip.text.x = element_text(size = 10)
-))
-}
-```
-
-### Other Graphs
-```{r, fig.height=10, fig.width=10}
-Rs_table <- week_Q10 %>% filter(Rs_Rh == "Rs", DEPTH == 5)
-  x2 <- ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_line() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rs Variation by Day/Night at depth", 5))
-ggsave("Rs5.png", x2)
-Rh_table <- week_Q10 %>% filter(Rs_Rh == "Rh", DEPTH == 5)
-  x3 <- ggplot(Rh_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rh Variation by Day/Night at depth", 5))
-ggsave("Rh5.png", x3)
-ggsave("Rs5.png", x2)
-
-print(ggplot(week_Q10 %>% filter(DAY_NIGHT == "day"), aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET+DEPTH, scales = "free_x") + labs(title = "Day Variation by Rs/Rh"))
-
-print(ggplot(month_Q10, aes(MAT, MAP, color = Q10)) + geom_jitter() + lims(color = c(0, 6)))
-```
-```{r Site Map}
-coord_table <- db_info %>% filter(CSR_DATASET %in% rh_dataset_names) %>% dplyr::select(CSR_DATASET, CSR_LONGITUDE, CSR_LATITUDE)
-coordinates(coord_table) <- ~CSR_LONGITUDE + CSR_LATITUDE
-coordinates(db_info) <- ~CSR_LONGITUDE + CSR_LATITUDE
-lflt <- addMarkers(leaflet(coord_table), label = coord_table$CSR_DATASET)
-addTiles(lflt)
-lflt <- addMarkers(leaflet(db_info), label = db_info$CSR_DATASET)
-addTiles(lflt)
-```
-
