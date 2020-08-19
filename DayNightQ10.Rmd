@@ -320,18 +320,45 @@ print(d2)
 Rs_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rs"]))
 Rh_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rh"]))
 Shared_depths_list <- intersect(Rs_depths_list, Rh_depths_list)
+
 for(depth in Shared_depths_list){
-  Rs_table <- week_Q10 %>% filter(Rs_Rh == "Rs", DEPTH == as.numeric(depth))
-  print(ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rs Variation by Day/Night at depth", depth)))
-  print(ggplot(week_Q10 %>% filter(Rs_Rh == "Rh", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rh Variation by Day/Night at depth", depth)) + theme(
-    strip.background = element_blank(),
-    strip.text.x = element_text(size = 10)
-  ))
-  print(ggplot(week_Q10 %>% filter(DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,6) + facet_grid(Rs_Rh~DATASET, scales = "free_x") + labs(title = paste("Rh and Rs Variation by Day/Night at depth", depth)) + 
-          theme(
-            strip.background = element_blank(),
-            strip.text.x = element_text(size = 10)
-          ))
+  Rs_table <- week_Q10 %>% 
+    filter(Rs_Rh == "Rs", DEPTH == as.numeric(depth))
+  
+  p <- ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) +
+    geom_point() + ylim(0,6) + 
+    facet_wrap(~DATASET, scales = "free_x") + 
+    labs(title = paste("Rs Variation by Day/Night at depth", depth))
+  print(p)
+  
+  # Do a paired t-test; is daytime Q10 > nighttime Q10?
+  Rs_table %>% 
+    dplyr::select(DATASET, MON_YEAR, DAY_NIGHT, Q10) %>% 
+    spread(DAY_NIGHT, Q10) %>% 
+    group_by(DATASET) %>% 
+    summarise(t_test_p = t.test(day, night, paired = TRUE)$p.value) %>% 
+    print()
+  
+  p <- week_Q10 %>% 
+    filter(Rs_Rh == "Rh", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET) %>% 
+    ggplot(aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) +
+    geom_point() + ylim(0,6) + 
+    facet_wrap(~DATASET, scales = "free_x") + 
+    labs(title = paste("Rh Variation by Day/Night at depth", depth)) +
+    theme(strip.background = element_blank(),
+          strip.text.x = element_text(size = 10))
+  print(p)
+  
+  p <- week_Q10 %>% 
+    filter(DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET) %>% 
+    ggplot(aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + 
+    geom_point() + 
+    ylim(0,6) + 
+    facet_grid(Rs_Rh~DATASET, scales = "free_x") + 
+    labs(title = paste("Rh and Rs Variation by Day/Night at depth", depth)) + 
+    theme( strip.background = element_blank(),
+           strip.text.x = element_text(size = 10))
+  print(p)
 }
 ```
 
