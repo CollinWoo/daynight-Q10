@@ -283,7 +283,7 @@ a <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "whit
 ggsave("R2 Distribution.png", a)
 a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 6) + labs(title = "Q10 Distribution")
 ggsave("Q10 Distribution.png", a2)
-a3 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + labs(title = "Q10 Distribution by Rs/Rh") + xlim(0, 6) + facet_wrap(~Rs_Rh)
+a3 <- week_Q10 %>% group_by(Rs_Rh) %>% summarise(medianval = median(Q10)) %>% right_join(week_Q10, by = "Rs_Rh") %>% ggplot(aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + labs(title = "Q10 Distribution by Rs/Rh") + xlim(0, 6) + facet_wrap(~Rs_Rh) + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept = medianval), color = "red", linetype="dashed", size = 1) + geom_text(aes(label = paste("Median =", round(medianval, digits=3))), x = 5, y = 150, size = 3)
 b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram(position = "dodge2") + facet_wrap(~DATASET) + labs(title = "R2 By Dataset")
 ggsave("R2 By Dataset.png", b)
 c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram(position = "dodge2") + xlim(0, 6) + facet_wrap(~DATASET) + labs(title = "Q10 By Dataset")
