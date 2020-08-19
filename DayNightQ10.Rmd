@@ -331,6 +331,14 @@ for(depth in Shared_depths_list){
     labs(title = paste("Rs Variation by Day/Night at depth", depth))
   print(p)
   
+  # Do a paired t-test; is daytime Q10 > nighttime Q10?
+  Rs_table %>% 
+    dplyr::select(DATASET, MON_YEAR, DAY_NIGHT, Q10) %>% 
+    spread(DAY_NIGHT, Q10) %>% 
+    group_by(DATASET) %>% 
+    summarise(t_test_p = t.test(day, night, paired = TRUE)$p.value) %>% 
+    print()
+  
   p <- week_Q10 %>% 
     filter(Rs_Rh == "Rh", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET) %>% 
     ggplot(aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) +
