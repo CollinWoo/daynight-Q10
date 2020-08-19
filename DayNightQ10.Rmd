@@ -367,20 +367,26 @@ print(ggplot(week_Q10 %>% filter(DAY_NIGHT == "day"), aes(MON_YEAR, Q10, color =
 
 print(ggplot(month_Q10, aes(MAT, MAP, color = Q10)) + geom_jitter() + lims(color = c(0, 6)))
 
+# Boxplots of Q10 versus MAP and MAT
 ggplot(month_Q10, aes(MAP, Q10)) + 
   geom_boxplot(aes(color = DATASET)) + 
   ylim(c(0, 6.5)) + 
   scale_color_discrete(guide = FALSE) +
+  xlab("MAP (mm)") +
   geom_smooth(data = filter(month_Q10, MAP < 1500), 
               method = "lm", linetype = 2, color = "black")
+ggsave("map_boxplot.png", width = 8, height = 5)
+
 ggplot(month_Q10, aes(MAT, Q10)) + 
   geom_boxplot(aes(color = DATASET)) + 
   ylim(c(0, 6.5)) + 
+  xlab(expression(MAT~( degree*C))) +
   scale_color_discrete(guide = FALSE) +
   geom_smooth(data = filter(month_Q10, MAT < 6), 
               method = "lm", linetype = 2, color = "black") +
   geom_smooth(data = filter(month_Q10, MAT >= 5), 
-              method = "lm", linetype = 2, color = "black")  
+              method = "lm", linetype = 2, color = "black")
+ggsave("mat_boxplot.png", width = 8, height = 5)
 ```
 
 ```{r Site Map}
