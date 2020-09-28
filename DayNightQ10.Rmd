@@ -12,6 +12,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
+library(tidyr)
 library(lubridate)
 library(ggplot2)
 #library(StreamMetabolism)
@@ -54,6 +55,16 @@ print(final_results)
 ```
 
 ## calc_q10 Function
+```{r p-value function from https://gettinggeneticsdone.blogspot.com/2011/01/rstats-function-for-extracting-f-test-p.html}
+lmp <- function (modelobject) {
+	if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+	f <- summary(modelobject)$fstatistic
+	p <- pf(f[1],f[2],f[3],lower.tail=F)
+	attributes(p) <- NULL
+	return(p)
+}
+```
+
 ```{r Q10 Function}
 calc_q10 <- function(temp, resp){
   positives <- resp > 0 & !is.na(temp) & !is.na(resp)
@@ -64,9 +75,17 @@ calc_q10 <- function(temp, resp){
   }
   lnresp <- log(resp)
   linReg <- lm(lnresp~temp)
+  sumReg <- summary(linReg)
   b <- linReg$coefficients[["temp"]]
   q10 <- exp(10*b)
-  return(q10)
+  r_squared = NA
+  p_val = NA
+  if(!is.infinite(q10) & !is.na(q10)){
+    r_squared <- sumReg$r.squared
+    p_val <- lmp(linReg)
+  }
+  return_val <- data.frame(Q10 = q10, R_SQUARED = r_squared, P_VALUE = p_val)
+  return(return_val)
 }
 ```
 
@@ -75,7 +94,7 @@ set.seed(2020)
 x <- 1:20
 y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
 plot(x,y)
-cat("The Q10 Value is", calc_q10(x,y))
+cat("The Q10 Value is", calc_q10(x,y)[,1])
 ```
 
 ## Ts Percentage
@@ -90,7 +109,7 @@ for(rhds in rh_dataset_names){
   resp <- dsd$CSR_FLUX_CO2
   for(tcol in temperature_columns){
     temp <- dsd[[tcol]]
-    results$q10[results$columns == tcol] = calc_q10(temp, resp)
+    results$q10[results$columns == tcol] = calc_q10(temp, resp)[,1]
     results$n[results$columns == tcol] = length(temp[!is.na(temp) & !is.na(resp)])
     depth <- gsub("^CSR_T", "", tcol)
     #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
@@ -114,10 +133,13 @@ for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
   ds_desc <- ds_data$description
+  ds_ports <- ds_data$ports
   
   column_names <- names(dsd)
   temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
   rh_ports <- final_results[final_results$Dataset == rhds, ][[2]]
+  rs_ports <- ds_ports[ds_ports$CSR_MSMT_VAR == "Rs",][[1]]
+  print(rs_ports)
   
   date <- as.Date(dsd$CSR_TIMESTAMP_END)
   lon <- ds_desc$CSR_LONGITUDE
@@ -132,10 +154,16 @@ for(rhds in rh_dataset_names){
   dsd %>% 
     mutate(DAY_NIGHT = case_when(
       sunrise < CSR_TIMESTAMP_BEGIN & CSR_TIMESTAMP_BEGIN < sunset ~ "day",
-      TRUE ~ "night")) %>%
-    filter(CSR_PORT %in% rh_ports, !is.na(CSR_FLUX_CO2), CSR_FLUX_CO2 > 0) %>%
-    mutate(WOY = week(CSR_TIMESTAMP_END), 
-           YEAR = year(CSR_TIMESTAMP_END)) -> 
+      TRUE ~ "night"), 
+      Rs_Rh = case_when(
+        CSR_PORT %in% rh_ports ~ "Rh", 
+        CSR_PORT %in% rs_ports ~ "Rs",
+        TRUE ~ "other")) %>%
+    filter(!is.na(CSR_FLUX_CO2), CSR_FLUX_CO2 > 0, Rs_Rh != "other") %>%
+    mutate(WOY = week(CSR_TIMESTAMP_END),
+           YEAR = year(CSR_TIMESTAMP_END), 
+           DAY_NIGHT = factor(DAY_NIGHT),
+           Rs_Rh = factor(Rs_Rh)) ->
     dsd
   
   for(tcol in temperature_columns){
@@ -148,21 +176,25 @@ for(rhds in rh_dataset_names){
       depth <- -1
     }
     dsd %>% 
-      group_by(YEAR, WOY, DAY_NIGHT) %>% 
+      group_by(YEAR, WOY, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
-                Q10 = calc_q10(temp, CSR_FLUX_CO2), 
-                TEMP = mean(temp, na.rm = TRUE), 
+                Q10 = calc_q10(temp, CSR_FLUX_CO2),
+                TEMP = mean(temp, na.rm=TRUE), 
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
-                N = n()) -> 
-      week_Q10[[paste(rhds, depth, sep = "_")]]
+                N = n()) %>% 
+      unpack(cols = Q10) -> 
+      week_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 bind_rows(week_Q10, .id = "ID") %>% 
   filter(!is.na(Q10), is.finite(Q10)) %>% 
+  select(DATASET, YEAR:WOY, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
   arrange(DATASET, DEPTH, YEAR, WOY) -> 
   week_Q10
+
 print(week_Q10, n = 1000)
+summary(week_Q10)
 ```
 
 ## Sunset/Sunrise Calculation Test
@@ -197,11 +229,15 @@ format(sunrise)
 ```
 
 ## Graphing Results
-```{r, fig.height=6}
+```{r, fig.height=6, eval = FALSE}
 p <- ggplot(week_Q10, aes(WOY, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + 
   geom_line(na.rm = TRUE) +
   ylim(c(0, 5)) + 
   facet_wrap(~ID+DEPTH)
 print(p)
+```
+```{r}
+a <- ggplot(week_Q10, aes(x = R_SQUARED)) + geom_histogram()
+print(a)
 ```
 
