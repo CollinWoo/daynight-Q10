@@ -1,0 +1,13 @@
+11/29/2016
+
+
+This is wgrib v1.8.1.2s (8-11) compiled using cygwin_x64.
+
+This should be compatible with 64-bit versions of Windows Vista and later.
+To use, copy all the *.dll and wgrib.exe files to a directory that is on your
+windows PATH.  Run wgrib from a shell such as the cygwin bash
+or the windows command prompt.  On windows 10, click on the bottom 
+left window icon, scroll to "Windows System" and click on it, and 
+finally click on "Command prompt".  Do not click on the wgrib icon.  
+The wgrib program was designed to run from a shell and is not a GUI program.
+

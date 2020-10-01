@@ -1,11 +1,30 @@
 ---
 title: "Extracting Moisture"
-output: html_document
+output:
+ html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(rNOMADS)
+#NOTE: wgrib2, which is required to run the ReadGrib() function, is really hard 
+#to download on Windows. I have attached the necessary files for a precompiled 
+#version to this repo. Just copy the directory location to PATH to have it work.
 ```
 
-## R Markdown
+```{r Tests}
+#just playing around with rNOMADS
+NOMADSRealTimeList("grib")
+```
+
+```{r Moisture}
+#Extract Sample Moisture data from NASA-USDA Global Soil Moisture Data
+ReadGrib("20100110_20100112.as1.grib", file.type="grib2", variables = )
+#Note to Self: levels are regions of the atmosphere, surface of the earth, or subsurface
+#variables are the type of data (ex: Temperature)
+```
+
 
