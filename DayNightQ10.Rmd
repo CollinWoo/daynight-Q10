@@ -430,3 +430,21 @@ lflt <- addMarkers(leaflet(db_info), label = db_info$CSR_DATASET)
 addTiles(lflt)
 ```
 
+```{r Moisture}
+#Extract Sample Moisture data from NASA-USDA Global Soil Moisture Data
+# <- ReadGrib("20100110_20100112.as1.grib", file.type="grib2", variables = "", levels ="")
+#Note to Self: levels are regions of the atmosphere, surface of the earth, or subsurface
+#variables are the type of data (ex: Temperature)
+
+moisture <- raster("20100110_20100112.as1.grib")
+extent(moisture) <- extent(-180, 180, -60, 90)
+projection(moisture) <- "+init=epsg:4326"
+plot(moisture)
+maps::map(add = T)
+colnames(MA_row)[1:2] <- c("x","y")
+print(MA_row)
+testlocal <- raster::extract(moisture, MA_row[1:2])
+print(testlocal)
+#helpful page: https://gis.stackexchange.com/questions/299954/unknown-projection-of-grib-file
+```
+
