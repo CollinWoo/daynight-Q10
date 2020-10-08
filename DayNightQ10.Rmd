@@ -174,6 +174,7 @@ for(rhds in rh_dataset_names){
   
   #Extract Mean Annual Data
   MA_row <- data.frame(LON = lon, LAT = lat)
+  
   # MAP data that matches the srdb coordinates
   raster::extract(precip, MA_row[1:2]) -> precip_coords
   apply(precip_coords, 1, sum) -> MA_row$MAP
@@ -435,45 +436,36 @@ addTiles(lflt)
 ```
 
 #Moisture Data
-```{r Moisture}
-#Extract Sample Moisture data from NASA-USDA Global Soil Moisture Data
-# <- ReadGrib("20100110_20100112.as1.grib", file.type="grib2", variables = "", levels ="")
-#Note to Self: levels are regions of the atmosphere, surface of the earth, or subsurface
-#variables are the type of data (ex: Temperature)
 
-moisture <- raster("20100110_20100112.as1.grib")
-extent(moisture) <- extent(-180, 180, -60, 90)
-projection(moisture) <- "+init=epsg:4326"
-plot(moisture)
-maps::map(add = T)
-colnames(MA_row)[1:2] <- c("x","y")
-print(MA_row)
-testlocal <- raster::extract(moisture, MA_row[1:2])
-print(testlocal)
-#helpful page: https://gis.stackexchange.com/questions/299954/unknown-projection-of-grib-file
-```
-
-```{r}
+```{r SMOS Functions}
 SMOSfiles <- function(date){
   #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
-  SMOShtml <- read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/")
-  SMOShtml %>% html_nodes(".indexcolname") %>% html_text() -> filenames
+  read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/") %>%
+  html_nodes(".indexcolname") %>% html_text() -> filenames
   
-  #convert to date
   fileDate <- as.Date(date)
+  #create vector of all possible file name dates
   probDate <- c(fileDate-1, fileDate, fileDate+1)
-  probDate <- lapply(probDate, as.Date)
-  probDate <- lapply(probDate, format, "%Y%m%d")
+  probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
   probDate[1] <- paste0(probDate[1], "_")
   probDate[3] <- paste0("_",probDate[3])
   patterns <- paste(probDate, collapse="|")
   matchfiles <- filenames[grep(patterns, filenames)]
   fileurls <- paste0("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/", matchfiles)
   #download.file(fileurls, "L03")
-  return(fileurls)
+  return(matchfiles)
 }
 
-SMOSfiles("2012/12/15")
-SMOSfiles("2012/12/14")
+SMOSdata <- function(date, lat, lon){
+  SMOSfile <- SMOSfiles(date)
+  SMOSfile %>% lapply(raster) %>% 
+  lapply(raster::extract, data.frame(x=lat, y=lon))
+  -> moisture
+  return(moisture)
+}
+  
+SMOSfiles("2012/12/18")
+SMOSfiles("2012/12/17")
+SMOSfiles("2012/12/16")
 ```
 
