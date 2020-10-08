@@ -19,6 +19,7 @@ library(suncalc)
 library(raster)
 library(zoo)
 library(leaflet)
+library(rvest)
 #library(StreamMetabolism)
 #library(NISTunits)
 
@@ -34,6 +35,8 @@ results <- list()
 
 ## Goal 1
 ```{r goal1, eval=TRUE, echo=FALSE}
+print(bio)
+print(precip)
 rh_dataset_names <- db_info[grep("Rh", db_info$CSR_MSMT_VAR),1][[1]]
 for(rhds in rh_dataset_names){
   print(rhds)
@@ -169,6 +172,7 @@ for(rhds in rh_dataset_names){
   sunrise <- sunrise_set[["sunrise"]]
   sunset <- sunrise_set[["sunset"]]
   
+  #Extract Mean Annual Data
   MA_row <- data.frame(LON = lon, LAT = lat)
   # MAP data that matches the srdb coordinates
   raster::extract(precip, MA_row[1:2]) -> precip_coords
@@ -430,6 +434,7 @@ lflt <- addMarkers(leaflet(db_info), label = db_info$CSR_DATASET)
 addTiles(lflt)
 ```
 
+#Moisture Data
 ```{r Moisture}
 #Extract Sample Moisture data from NASA-USDA Global Soil Moisture Data
 # <- ReadGrib("20100110_20100112.as1.grib", file.type="grib2", variables = "", levels ="")
@@ -446,5 +451,29 @@ print(MA_row)
 testlocal <- raster::extract(moisture, MA_row[1:2])
 print(testlocal)
 #helpful page: https://gis.stackexchange.com/questions/299954/unknown-projection-of-grib-file
+```
+
+```{r}
+SMOSfiles <- function(date){
+  #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
+  SMOShtml <- read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/")
+  SMOShtml %>% html_nodes(".indexcolname") %>% html_text() -> filenames
+  
+  #convert to date
+  fileDate <- as.Date(date)
+  probDate <- c(fileDate-1, fileDate, fileDate+1)
+  probDate <- lapply(probDate, as.Date)
+  probDate <- lapply(probDate, format, "%Y%m%d")
+  probDate[1] <- paste0(probDate[1], "_")
+  probDate[3] <- paste0("_",probDate[3])
+  patterns <- paste(probDate, collapse="|")
+  matchfiles <- filenames[grep(patterns, filenames)]
+  fileurls <- paste0("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/", matchfiles)
+  #download.file(fileurls, "L03")
+  return(fileurls)
+}
+
+SMOSfiles("2012/12/15")
+SMOSfiles("2012/12/14")
 ```
 

@@ -30,12 +30,14 @@ NOMADSRealTimeList("grib")
 
 moisture <- raster("20100110_20100112.as1.grib")
 print(moisture)
+#newmoisture <- projectRaster(moisture, crs = "+proj=longlat")
+#print(newmoisture)
 extent(moisture) <- extent(-180, 180, -60, 90)
 projection(moisture) <- "+init=epsg:4326"
 plot(moisture)
 maps::map(add = T)
 
-testlocal <- raster::extract(moisture, data.frame(x=-167.125, y=60.125))
+testlocal <- raster::extract(moisture, data.frame(x=-150.123, y=60.123))
 print(testlocal)
 print(rasterToPoints(moisture))
 #helpful page: https://gis.stackexchange.com/questions/299954/unknown-projection-of-grib-file
