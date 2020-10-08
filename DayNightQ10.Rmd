@@ -465,9 +465,7 @@ SMOSdata <- function(date, lon, lat){
   SMOSfile <- SMOSfiles(date)
   SMOSfile %>% lapply(raster) -> SMOSfile
   extent(SMOSfile[[1]]) <- extent(-180, 180, -60, 90)
-  projection(SMOSfile[[1]]) <- "+init=epsg:4326"
   extent(SMOSfile[[2]]) <- extent(-180, 180, -60, 90)
-  projection(SMOSfile[[2]]) <- "+init=epsg:4326"
   lapply(SMOSfile, raster::extract, data.frame(x=lon, y=lat)) ->
   moisture
   return(moisture)
