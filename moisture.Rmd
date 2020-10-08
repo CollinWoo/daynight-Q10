@@ -37,7 +37,7 @@ projection(moisture) <- "+init=epsg:4326"
 plot(moisture)
 maps::map(add = T)
 
-testlocal <- raster::extract(moisture, data.frame(x=-150.123, y=60.123))
+testlocal <- raster::extract(moisture, data.frame(x=-150.1234, y=60.1234))
 print(testlocal)
 print(rasterToPoints(moisture))
 #helpful page: https://gis.stackexchange.com/questions/299954/unknown-projection-of-grib-file
