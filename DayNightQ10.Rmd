@@ -438,7 +438,7 @@ addTiles(lflt)
 
 #Moisture Data
 
-```{r SMOS Functions}
+```{r SMOS Functions, eval=FALSE}
 SMOSfiles <- function(date){
   #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
   read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/") %>%
@@ -457,7 +457,8 @@ SMOSfiles <- function(date){
   patterns <- paste(probDate, collapse="|")
   matchfiles <- filenames[grep(patterns, filenames)]
   fileurls <- paste0("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/", matchfiles)
-  #download.file(fileurls, "L03")
+  download.file(fileurls[1], destfile= paste0("./L03", matchfiles[1]), method = "curl") #<- this doesn't work, 403 forbidden error
+  download.file(fileurls[2], destfile= paste0("./L03", matchfiles[2]), method = "curl")
   return(matchfiles)
 }
 
@@ -466,6 +467,7 @@ SMOSdata <- function(date, lon, lat){
   SMOSfile %>% lapply(raster) -> SMOSfile
   extent(SMOSfile[[1]]) <- extent(-180, 180, -60, 90)
   extent(SMOSfile[[2]]) <- extent(-180, 180, -60, 90)
+  print(SMOSfile[1])
   lapply(SMOSfile, raster::extract, data.frame(x=lon, y=lat)) ->
   moisture
   return(moisture)
