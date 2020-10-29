@@ -483,6 +483,7 @@ SMOSfiles <- function(date){
   probDate[3] <- paste0("_",probDate[3])
   
   patterns <- paste(probDate, collapse="|")
+  print(patterns)
   matchfiles <- filenames[grep(patterns, filenames)]
   fileurls <- paste0("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/", matchfiles)
   matchfiles <- paste0("./L03/", matchfiles)
@@ -491,8 +492,8 @@ SMOSfiles <- function(date){
     try(download.file(fileurls[1], destfile= paste0(matchfiles[1]), method = "curl"))
     try(download.file(fileurls[2], destfile= paste0(matchfiles[2]), method = "curl"))
   }
-  
-  return(matchfiles)
+  names(matchfiles) = c("Soil Surface", "Subsurface")
+  return(data.frame(as.list(matchfiles)))
 }
 
 SMOSdata <- function(date, lon, lat){
@@ -520,9 +521,9 @@ load_from_grib_file <- function(filename, lon, lat) {
 }
 
 get_sm_data <- function(lon, lat, timestamps) {
-  print(timestamps)
-  moisture_values <- sapply(timestamps, SMOSfiles) %>% unique() %>% lapply(load_from_grib_file, lon=lon,lat=lat)
-  print(moisture_values)
+  moisture_frame = data.frame(Times = timestamps)
+  moisture_frame %>% mutate(Files = SMOSfiles(Times)) %>% unpack(cols=Files) %>% distinct(Soil.Surface, .keep_all = TRUE) %>% mutate(Soil.Surface = load_from_grib_file(Soil.Surface, lon, lat), Subsurface = load_from_grib_file(Subsurface, lon, lat)) -> moisture_frame
+  print(moisture_frame)
   #fill method may be useful
 }
 
