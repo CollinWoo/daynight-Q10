@@ -15,6 +15,7 @@ library(rNOMADS)
 #version to this repo. Just copy the directory location to PATH to have it work.
 library(raster)
 library(rgdal)
+library(tidyr)
 ```
 
 ```{r Tests, eval=FALSE}
@@ -28,18 +29,25 @@ NOMADSRealTimeList("grib")
 #Note to Self: levels are regions of the atmosphere, surface of the earth, or subsurface
 #variables are the type of data (ex: Temperature)
 
-moisture <- raster("20100110_20100112.as1.grib")
-print(moisture)
+moisture <- raster("L03/20100110_20100112.as1.grib")
+
 #newmoisture <- projectRaster(moisture, crs = "+proj=longlat")
 #print(newmoisture)
-extent(moisture) <- extent(-180, 180, -60, 90)
-projection(moisture) <- "+init=epsg:4326"
+#extent(moisture) <- extent(-180, 180, -60, 90)
+#projection(moisture) <- "+proj=longlat +no_defs +init=epsg:4326"
+#moisture <- projectRaster(moisture, crs="+proj=longlat +datum=WGS84 +no_defs")
+crs(moisture) <- "+proj=stere +lat_0=90 +lat_ts=60 +lon_0=1 +x_0=0 +y_0=0 +R=6371200 +units=m +no_defs +datum=WGS84 +ellps=WGS84"
 plot(moisture)
 maps::map(add = T)
+lat <- c(-80:80)
+long <- c(-170, 70)
+xy <- crossing(long, lat)  # crosses the Sahara so should be easy to see if correct
+sp <- SpatialPoints(xy, proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs"))
+print(sp)
+raster::extract(moisture, sp, df=TRUE)
 
-testlocal <- raster::extract(moisture, data.frame(x=-150.1234, y=60.1234))
-print(testlocal)
-print(rasterToPoints(moisture))
+#testlocal <- raster::extract(moisture, data.frame(x= 50.1234, y=60.1))
+#print(testlocal)
 #helpful page: https://gis.stackexchange.com/questions/299954/unknown-projection-of-grib-file
 ```
 
