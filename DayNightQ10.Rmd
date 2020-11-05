@@ -552,7 +552,7 @@ SMOStif <- function(datevec, lon, lat){
       dateFiles[value, 3] = extractSMOS(dateFiles[[value, 3]], lon, lat)
     }
   }
-  
+  print(dateFiles)
   return(dateFiles)
 }
 
@@ -580,11 +580,11 @@ get_sm_data <- function(lon, lat, timestamps) {
 
 library(lubridate)
 timestamps <- seq(ymd_hms("2020-10-22 16:42:00"), by = 1000, length.out = 10)
-big_timestamps <- seq(ymd_hms("2020-10-22 16:42:00"), by = 1000, length.out = 1e5)
+big_timestamps <- seq(ymd_hms("2011-10-22 16:42:00"), by = 1000, length.out = 1e5)
 
 # Report timing:
 system.time(get_sm_data(1, 1, timestamps))
-system.time(SMOStif(big_timestamps))
+system.time(SMOStif(big_timestamps, 1, 1))
 ```
 
 
