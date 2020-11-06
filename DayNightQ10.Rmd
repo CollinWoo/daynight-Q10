@@ -518,13 +518,38 @@ extractSMOS <- function(filename, lon, lat){
   return(moistval)
 }
 
+SMOStifnames <- function(datevec){
+  tifiles <- list.files("LO3_tif")
+  dateFiles <- c()
+  fileDates <- as.Date(datevec)
+  
+  for(date in fileDates){
+    probDate <- c(date-1, date, date+1)
+    probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
+    probDate[1] <- paste0(probDate[1], "_")
+    probDate[3] <- paste0("_",probDate[3])
+    patterns <- paste(probDate, collapse="|")
+    matchfiles <- tifiles[grep(patterns, tifiles)]
+    
+    if(length(matchfiles) > 0){
+      matchfiles <- paste0("./LO3_tif/", matchfiles)[[1]]
+    }else{
+        matchfiles <- NA
+    }
+    
+    dateFiles <- append(dateFiles, matchfiles)
+  }
+  
+  cat("thing:", dateFiles)
+  return(dateFiles)
+}
+
 SMOStif <- function(datevec, lon, lat){
   tifiles <- list.files("LO3_tif")
   dateFiles <- list()
   fileDates <- unique(as.Date(datevec))
   
   for(date in fileDates){
-    print(date)
     probDate <- c(date-1, date, date+1)
     probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
     
@@ -537,26 +562,29 @@ SMOStif <- function(datevec, lon, lat){
       matchfiles <- paste0("./LO3_tif/", matchfiles)
     }
     
-    fileRow <- data.frame(Surface = matchfiles[1], Subsurface = matchfiles[2])
+    fileRow <- data.frame(Surface.File = matchfiles[1], Subsurface.File = matchfiles[2])
     dateFiles[[toString(as.Date(date))]] <- fileRow
   }
   
   bind_rows(dateFiles, .id = "Date") %>% 
-    distinct(Surface, .keep_all = TRUE) %>% 
-    filter(!is.na(Surface)) ->  dateFiles
+    distinct(Surface.File, .keep_all = TRUE) %>% 
+    filter(!is.na(Surface.File)) ->  dateFiles
   
   #I can't use mutate on the raster function so I thought this for loop was the next best option
   if(nrow(dateFiles) > 0){
     for(value in 1:nrow(dateFiles)){
-      dateFiles[value, 2] = extractSMOS(dateFiles[[value, 2]], lon, lat)
-      dateFiles[value, 3] = extractSMOS(dateFiles[[value, 3]], lon, lat)
+      dateFiles[value, 4] = extractSMOS(dateFiles[[value, 2]], lon, lat)
+      dateFiles[value, 5] = extractSMOS(dateFiles[[value, 3]], lon, lat)
     }
   }
+  
+  dateFiles %>% rename(Surface = V4, Subsurface = V5) -> dateFiles
   print(dateFiles)
   return(dateFiles)
 }
 
 SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
+SMOStifnames(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
 extractSMOS(c("./LO3_tif/20100110_20100112.as1.tif"), 30, 60)
 SMOSfiles(c("2012/5/18", "2012/5/18", "2012/5/18","2012/5/19", "2012/5/18"))
 SMOSfiles("2012/12/17")
@@ -584,7 +612,7 @@ big_timestamps <- seq(ymd_hms("2011-10-22 16:42:00"), by = 1000, length.out = 1e
 
 # Report timing:
 system.time(get_sm_data(1, 1, timestamps))
-system.time(SMOStif(big_timestamps, 1, 1))
+system.time(SMOStif(big_timestamps, 8, 23))
 ```
 
 
