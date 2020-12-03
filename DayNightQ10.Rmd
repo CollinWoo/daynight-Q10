@@ -116,6 +116,14 @@ calc_q10 <- function(temp, resp, out.rm = TRUE){
 }
 ```
 
+```{r Q10 Function Test}
+set.seed(2020)
+x <- 1:20
+y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
+plot(x,y)
+cat("The Q10 Value is", calc_q10(x,y)[,1])
+```
+
 ```{r SMOS Functions}
 SMOSfiles <- function(date){
   #lastChecked = as.Date(readLines("lastChecked.txt"))
@@ -165,8 +173,8 @@ SMOStifnames <- function(datevec){
   for(date in fileDates){
     probDate <- c(date-1, date, date+1)
     probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
-    probDate[1] <- paste0(probDate[1], "_")
-    probDate[3] <- paste0("_",probDate[3])
+    probDate[seq(1, length(probDate), 3)] <- paste0(probDate[seq(1, length(probDate), 3)], "_")
+    probDate[seq(3, length(probDate), 3)] <- paste0("_",probDate[seq(3, length(probDate), 3)])
     patterns <- paste(probDate, collapse="|")
     matchfiles <- tifiles[grep(patterns, tifiles)]
     
@@ -222,12 +230,14 @@ SMOStif <- function(datevec, lon, lat){
 }
 ```
 
-```{r Q10 Function Test}
-set.seed(2020)
-x <- 1:20
-y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
-plot(x,y)
-cat("The Q10 Value is", calc_q10(x,y)[,1])
+```{r Moisture Tests, eval = FALSE}
+#SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
+SMOStifnames(c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+testFrame = data.frame(dates = c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
+testMoisture = SMOStif(testFrame$dates, 1, 1)
+testFrame %>% left_join(testMoisture, by="Surface.File") -> testFrame
+print(testFrame)
 ```
 
 ## Ts Percentage
@@ -335,7 +345,8 @@ for(rhds in rh_dataset_names){
     } else {
       depth <- -1
     }
-    dsd %>% 
+   
+     dsd %>% 
       group_by(YEAR, MONTH, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
@@ -612,7 +623,7 @@ ggplot(month_Q10, aes(MAT, Q10)) +
               method = "lm", linetype = 2, color = "black")
 ggsave("mat_boxplot.png", width = 8, height = 5)
 
-ggplot(yearonly_Q10, aes(MAT, SURFACE)) + geom_point(aes(size=Q10))
+ggplot(yearonly_Q10, aes(temp, SURFACE)) + geom_point(aes(size=Q10))
 ```
 
 ```{r Site Map}
@@ -627,15 +638,7 @@ addTiles(lflt)
 
 #Moisture Data
 
-```{r Tests, eval = FALSE}
-#SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
-SMOStifnames(c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame = data.frame(dates = c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
-testMoisture = SMOStif(testFrame$dates, 1, 1)
-testFrame %>% left_join(testMoisture, by="Surface.File") -> testFrame
-print(testFrame)
-```
+
 ```{r get_sm_data, eval = FALSE}
 load_from_grib_file <- function(filename, lon, lat) {
   # Let's say it takes 1/10 of a second to open file and 1/20th s for each data point within file
