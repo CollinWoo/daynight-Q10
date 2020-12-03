@@ -116,6 +116,112 @@ calc_q10 <- function(temp, resp, out.rm = TRUE){
 }
 ```
 
+```{r SMOS Functions}
+SMOSfiles <- function(date){
+  #lastChecked = as.Date(readLines("lastChecked.txt"))
+  #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
+  read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/") %>%
+  html_nodes(".indexcolname") %>% html_text() -> filenames
+  print(length(date))
+  fileDate <- as.Date(date)
+  #create vector of all possible file name dates
+  probDate <- c(fileDate-1, fileDate, fileDate+1)
+  probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
+  
+  #make sure that the earliest possible date is the first date in the file name
+  probDate[1] <- paste0(probDate[1], "_")
+  #make suer that the latest possible date is the last date in the file name
+  probDate[3] <- paste0("_",probDate[3])
+  
+  patterns <- paste(probDate, collapse="|")
+  print(patterns)
+  matchfiles <- filenames[grep(patterns, filenames)]
+  if(length(matchfiles)==0){
+    return(data.frame(Soil.Surface = "No Files", Subsurface = "No Files"))
+  }
+  fileurls <- paste0("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/", matchfiles)
+  matchfiles <- paste0("./L03/", matchfiles)
+  
+  if(!file.exists(matchfiles[1])){
+    download.file(fileurls[1], destfile= paste0(matchfiles[1]), method = "curl")
+    download.file(fileurls[2], destfile= paste0(matchfiles[2]), method = "curl")
+  }
+  names(matchfiles) = c("Soil Surface", "Subsurface")
+  return(data.frame(as.list(matchfiles)))
+}
+
+extractSMOS <- function(filename, lon, lat){
+  moisture <- raster(filename)
+  sp <- SpatialPoints(cbind(lon, lat), proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs"))
+  moistval <- raster::extract(moisture, sp)
+  return(moistval)
+}
+
+SMOStifnames <- function(datevec){
+  tifiles <- list.files("LO3_tif")
+  dateFiles <- c()
+  fileDates <- as.Date(datevec)
+  
+  for(date in fileDates){
+    probDate <- c(date-1, date, date+1)
+    probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
+    probDate[1] <- paste0(probDate[1], "_")
+    probDate[3] <- paste0("_",probDate[3])
+    patterns <- paste(probDate, collapse="|")
+    matchfiles <- tifiles[grep(patterns, tifiles)]
+    
+    if(length(matchfiles) > 0){
+      matchfiles <- paste0("./LO3_tif/", matchfiles)[[1]]
+    }else{
+        matchfiles <- NA
+    }
+    
+    dateFiles <- append(dateFiles, matchfiles)
+  }
+  
+  return(dateFiles)
+}
+
+SMOStif <- function(datevec, lon, lat){
+  tifiles <- list.files("LO3_tif")
+  dateFiles <- list()
+  fileDates <- unique(as.Date(datevec))
+  
+  for(date in fileDates){
+    probDate <- c(date-1, date, date+1)
+    probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
+    
+    probDate[1] <- paste0(probDate[1], "_")
+    probDate[3] <- paste0("_",probDate[3])
+    patterns <- paste(probDate, collapse="|")
+    matchfiles <- tifiles[grep(patterns, tifiles)]
+    
+    if(length(matchfiles) >0){
+      matchfiles <- paste0("./LO3_tif/", matchfiles)
+    }
+    
+    fileRow <- data.frame(Surface.File = matchfiles[1], Subsurface.File = matchfiles[2])
+    dateFiles[[toString(as.Date(date))]] <- fileRow
+  }
+  
+  bind_rows(dateFiles, .id = "Date") %>% 
+    distinct(Surface.File, .keep_all = TRUE) %>% 
+    filter(!is.na(Surface.File)) ->  dateFiles
+  
+  #I can't use mutate on the raster function so I thought this for loop was the next best option
+  if(nrow(dateFiles) > 0){
+    for(value in 1:nrow(dateFiles)){
+      dateFiles[value, 4] = extractSMOS(dateFiles[[value, 2]], lon, lat)
+      dateFiles[value, 5] = extractSMOS(dateFiles[[value, 3]], lon, lat)
+    }
+  }
+  
+  dateFiles %>% rename(Surface = V4, Subsurface = V5) %>%
+    mutate(Lon = lon, Lat = lat)-> dateFiles
+  return(dateFiles)
+}
+```
+
 ```{r Q10 Function Test}
 set.seed(2020)
 x <- 1:20
@@ -157,6 +263,7 @@ print(summary(main_results))
 ```{r by week, cache = TRUE}
 week_Q10 <- list()
 year_Q10 <- list()
+yearonly_Q10 <- list()
 MA_set <- list()
 for(rhds in rh_dataset_names){
   ds_data <- csr_dataset(rhds)
@@ -174,6 +281,8 @@ for(rhds in rh_dataset_names){
   lat <- ds_desc$CSR_LATITUDE
   timezone <- attr(dsd$CSR_TIMESTAMP_END, "tzone")
   
+  igbp <- db_info$CSR_IGBP[[db_info$CSR_DATASET == rhds]]
+    
   sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"), tz = timezone)
   #sunrise_set <- sunrise.set(lat, lon, date)
   sunrise <- sunrise_set[["sunrise"]]
@@ -235,6 +344,7 @@ for(rhds in rh_dataset_names){
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
                 SURFACE = mean(Surface),
                 SUBSURFACE = mean(Subsurface),
+                IGBP = igbp,
                 N = n()) %>% 
       unpack(cols = Q10) %>%
       mutate(MON_YEAR = paste(YEAR, MONTH, 15, sep = "/"), 
@@ -249,9 +359,26 @@ for(rhds in rh_dataset_names){
                 Q10 = calc_q10(temp, CSR_FLUX_CO2, out.rm=TRUE),
                 TEMP = mean(temp, na.rm=TRUE),
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
+                SURFACE = mean(Surface),
+                SUBSURFACE = mean(Subsurface),
+                IGBP = igbp,
                 N = n()) %>%
       unpack(cols = Q10) ->
       year_Q10[[paste(rhds, depth, sep="_")]]
+    
+     dsd %>%
+      group_by(YEAR) %>%
+      summarize(DATASET = rhds,
+                DEPTH = depth,
+                Q10 = calc_q10(temp, CSR_FLUX_CO2, out.rm=TRUE),
+                TEMP = mean(temp, na.rm=TRUE),
+                RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
+                SURFACE = mean(Surface),
+                SUBSURFACE = mean(Subsurface),
+                IGBP = igbp,
+                N = n()) %>%
+      unpack(cols = Q10) ->
+      yearonly_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
 #as.yearmon(paste(YEAR, MONTH), "%Y %m")
@@ -271,6 +398,13 @@ bind_rows(year_Q10, .id = "ID") %>%
   arrange(DATASET, DEPTH, YEAR) %>%
   left_join(MA_set, by = "DATASET") -> 
   year_Q10
+
+bind_rows(yearonly_Q10, .id = "ID") %>% 
+  filter(!is.na(Q10), is.finite(Q10)) %>% 
+  dplyr::select(DATASET, YEAR, DEPTH:RESP, SURFACE, SUBSURFACE, N) %>% 
+  arrange(DATASET, DEPTH, YEAR) %>%
+  left_join(MA_set, by = "DATASET") -> 
+  yearonly_Q10
 
 print(week_Q10)
 summary(week_Q10)
@@ -321,10 +455,12 @@ print(p)
 
 ### Distributions
 ```{r Distr, fig.width=10}
-monthR2 <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white") + labs(title = "R2 Distribution") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.15, y = 400, size = 3)
+R2distr <- geom_histogram(color= "black", fill = "white") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red")
+  
+monthR2 <- ggplot(week_Q10, aes(x = R2)) + R2distr + labs(title = "R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.15, y = 400, size = 3)
 ggsave("R2 Distribution.png", monthR2)
 
-yearR2 <- ggplot(year_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white") + labs(title = "Year R2 Distribution") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.3, y = 20, size = 3)
+yearR2 <- ggplot(year_Q10, aes(x = R2)) + R2distr + labs(title = "Year R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.3, y = 20, size = 3)
 ggsave("Year R2 Distribution.png", yearR2)
 
 a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 12.5) + labs(title = "Q10 Distribution") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept=median(Q10)), linetype="dashed") + geom_text(aes(label = paste("Median =", round(median(Q10), digits=3))), x = 5, y = 150, size = 3) + geom_text(aes(label = paste("Mean =", round(mean(Q10), digits=3))), x = 5, y = 200, size = 3)
@@ -475,6 +611,8 @@ ggplot(month_Q10, aes(MAT, Q10)) +
   geom_smooth(data = filter(month_Q10, MAT >= 5), 
               method = "lm", linetype = 2, color = "black")
 ggsave("mat_boxplot.png", width = 8, height = 5)
+
+ggplot(yearonly_Q10, aes(MAT, SURFACE)) + geom_point(aes(size=Q10))
 ```
 
 ```{r Site Map}
@@ -488,125 +626,15 @@ addTiles(lflt)
 ```
 
 #Moisture Data
-```{r SMOS Functions}
-SMOSfiles <- function(date){
-  #lastChecked = as.Date(readLines("lastChecked.txt"))
-  #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
-  read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/") %>%
-  html_nodes(".indexcolname") %>% html_text() -> filenames
-  print(length(date))
-  fileDate <- as.Date(date)
-  #create vector of all possible file name dates
-  probDate <- c(fileDate-1, fileDate, fileDate+1)
-  probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
-  
-  #make sure that the earliest possible date is the first date in the file name
-  probDate[1] <- paste0(probDate[1], "_")
-  #make suer that the latest possible date is the last date in the file name
-  probDate[3] <- paste0("_",probDate[3])
-  
-  patterns <- paste(probDate, collapse="|")
-  print(patterns)
-  matchfiles <- filenames[grep(patterns, filenames)]
-  if(length(matchfiles)==0){
-    return(data.frame(Soil.Surface = "No Files", Subsurface = "No Files"))
-  }
-  fileurls <- paste0("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/", matchfiles)
-  matchfiles <- paste0("./L03/", matchfiles)
-  
-  if(!file.exists(matchfiles[1])){
-    download.file(fileurls[1], destfile= paste0(matchfiles[1]), method = "curl")
-    download.file(fileurls[2], destfile= paste0(matchfiles[2]), method = "curl")
-  }
-  names(matchfiles) = c("Soil Surface", "Subsurface")
-  return(data.frame(as.list(matchfiles)))
-}
-
-extractSMOS <- function(filename, lon, lat){
-  moisture <- raster(filename)
-  sp <- SpatialPoints(cbind(lon, lat), proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs"))
-  moistval <- raster::extract(moisture, sp)
-  return(moistval)
-}
-
-SMOStifnames <- function(datevec){
-  tifiles <- list.files("LO3_tif")
-  dateFiles <- c()
-  fileDates <- as.Date(datevec)
-  
-  for(date in fileDates){
-    probDate <- c(date-1, date, date+1)
-    probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
-    probDate[1] <- paste0(probDate[1], "_")
-    probDate[3] <- paste0("_",probDate[3])
-    patterns <- paste(probDate, collapse="|")
-    matchfiles <- tifiles[grep(patterns, tifiles)]
-    
-    if(length(matchfiles) > 0){
-      matchfiles <- paste0("./LO3_tif/", matchfiles)[[1]]
-    }else{
-        matchfiles <- NA
-    }
-    
-    dateFiles <- append(dateFiles, matchfiles)
-  }
-  
-  return(dateFiles)
-}
-
-SMOStif <- function(datevec, lon, lat){
-  tifiles <- list.files("LO3_tif")
-  dateFiles <- list()
-  fileDates <- unique(as.Date(datevec))
-  
-  for(date in fileDates){
-    probDate <- c(date-1, date, date+1)
-    probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
-    
-    probDate[1] <- paste0(probDate[1], "_")
-    probDate[3] <- paste0("_",probDate[3])
-    patterns <- paste(probDate, collapse="|")
-    matchfiles <- tifiles[grep(patterns, tifiles)]
-    
-    if(length(matchfiles) >0){
-      matchfiles <- paste0("./LO3_tif/", matchfiles)
-    }
-    
-    fileRow <- data.frame(Surface.File = matchfiles[1], Subsurface.File = matchfiles[2])
-    dateFiles[[toString(as.Date(date))]] <- fileRow
-  }
-  
-  bind_rows(dateFiles, .id = "Date") %>% 
-    distinct(Surface.File, .keep_all = TRUE) %>% 
-    filter(!is.na(Surface.File)) ->  dateFiles
-  
-  #I can't use mutate on the raster function so I thought this for loop was the next best option
-  if(nrow(dateFiles) > 0){
-    for(value in 1:nrow(dateFiles)){
-      dateFiles[value, 4] = extractSMOS(dateFiles[[value, 2]], lon, lat)
-      dateFiles[value, 5] = extractSMOS(dateFiles[[value, 3]], lon, lat)
-    }
-  }
-  
-  dateFiles %>% rename(Surface = V4, Subsurface = V5) %>%
-    mutate(Lon = lon, Lat = lat)-> dateFiles
-  print(dateFiles)
-  return(dateFiles)
-}
-```
 
 ```{r Tests, eval = FALSE}
-SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
-SMOStifnames(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame = data.frame(dates = c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+#SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
+SMOStifnames(c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+testFrame = data.frame(dates = c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
 testMoisture = SMOStif(testFrame$dates, 1, 1)
-testFrame %>% left_join(testMoisture, by="Surface.File")
+testFrame %>% left_join(testMoisture, by="Surface.File") -> testFrame
 print(testFrame)
-extractSMOS(c("./LO3_tif/20100110_20100112.as1.tif"), 30, 60)
-SMOSfiles(c("2012/5/18", "2012/5/18", "2012/5/18","2012/5/19", "2012/5/18"))
-SMOSfiles("2012/12/17")
-SMOSfiles("202/12/16")
 ```
 ```{r get_sm_data, eval = FALSE}
 load_from_grib_file <- function(filename, lon, lat) {
