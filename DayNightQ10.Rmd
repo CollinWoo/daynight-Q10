@@ -130,7 +130,6 @@ SMOSfiles <- function(date){
   #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
   read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/") %>%
   html_nodes(".indexcolname") %>% html_text() -> filenames
-  print(length(date))
   fileDate <- as.Date(date)
   #create vector of all possible file name dates
   probDate <- c(fileDate-1, fileDate, fileDate+1)
@@ -222,6 +221,8 @@ SMOStif <- function(datevec, lon, lat){
       dateFiles[value, 4] = extractSMOS(dateFiles[[value, 2]], lon, lat)
       dateFiles[value, 5] = extractSMOS(dateFiles[[value, 3]], lon, lat)
     }
+  }else{
+    dateFiles = data.frame(Surface.File = c(NA), `V4` = c(NA), `V5` = c(NA))
   }
   
   dateFiles %>% rename(Surface = V4, Subsurface = V5) %>%
@@ -233,9 +234,10 @@ SMOStif <- function(datevec, lon, lat){
 ```{r Moisture Tests, eval = FALSE}
 #SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
 SMOStifnames(c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame = data.frame(dates = c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+testFrame = data.frame(dates = c("1013/5/18", "1013/5/18", "1013/6/18", "2021/12/12", "1013/6/20", "1013/6/21"))
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
 testMoisture = SMOStif(testFrame$dates, 1, 1)
+print(testMoisture)
 testFrame %>% left_join(testMoisture, by="Surface.File") -> testFrame
 print(testFrame)
 ```
@@ -291,7 +293,7 @@ for(rhds in rh_dataset_names){
   lat <- ds_desc$CSR_LATITUDE
   timezone <- attr(dsd$CSR_TIMESTAMP_END, "tzone")
   
-  igbp <- db_info$CSR_IGBP[[db_info$CSR_DATASET == rhds]]
+  igbp <- db_info$CSR_IGBP[db_info$CSR_DATASET == rhds]
     
   sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"), tz = timezone)
   #sunrise_set <- sunrise.set(lat, lon, date)
@@ -398,21 +400,21 @@ MA_set <- bind_rows(MA_set, .id = "DATASET")
 
 bind_rows(week_Q10, .id = "ID") %>% 
   filter(!is.na(Q10), is.finite(Q10)) %>% 
-  dplyr::select(DATASET, YEAR:MONTH, MON_YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
+  dplyr::select(DATASET, YEAR:MONTH, MON_YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, IGBP, N) %>% 
   arrange(DATASET, DEPTH, YEAR, MONTH) %>%
   left_join(MA_set, by = "DATASET") -> 
   week_Q10
 
 bind_rows(year_Q10, .id = "ID") %>% 
   filter(!is.na(Q10), is.finite(Q10)) %>% 
-  dplyr::select(DATASET, YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, N) %>% 
+  dplyr::select(DATASET, YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, IGBP, N) %>% 
   arrange(DATASET, DEPTH, YEAR) %>%
   left_join(MA_set, by = "DATASET") -> 
   year_Q10
 
 bind_rows(yearonly_Q10, .id = "ID") %>% 
   filter(!is.na(Q10), is.finite(Q10)) %>% 
-  dplyr::select(DATASET, YEAR, DEPTH:RESP, SURFACE, SUBSURFACE, N) %>% 
+  dplyr::select(DATASET, YEAR, DEPTH:RESP, SURFACE, SUBSURFACE, IGBP, N) %>% 
   arrange(DATASET, DEPTH, YEAR) %>%
   left_join(MA_set, by = "DATASET") -> 
   yearonly_Q10
