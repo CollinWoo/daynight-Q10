@@ -212,21 +212,19 @@ SMOStif <- function(datevec, lon, lat){
   }
   
   bind_rows(dateFiles, .id = "Date") %>% 
+    mutate(Surface = NA, Subsurface = NA) %>%
     distinct(Surface.File, .keep_all = TRUE) %>% 
     filter(!is.na(Surface.File)) ->  dateFiles
   
   #I can't use mutate on the raster function so I thought this for loop was the next best option
+  
   if(nrow(dateFiles) > 0){
     for(value in 1:nrow(dateFiles)){
-      dateFiles[value, 4] = extractSMOS(dateFiles[[value, 2]], lon, lat)
-      dateFiles[value, 5] = extractSMOS(dateFiles[[value, 3]], lon, lat)
+      dateFiles$Surface[value] = extractSMOS(dateFiles[[value, 2]], lon, lat)
+      dateFiles$Subsurface[value] = extractSMOS(dateFiles[[value, 3]], lon, lat)
     }
-  }else{
-    dateFiles = data.frame(Surface.File = c(NA), `V4` = c(NA), `V5` = c(NA))
   }
   
-  dateFiles %>% rename(Surface = V4, Subsurface = V5) %>%
-    mutate(Lon = lon, Lat = lat)-> dateFiles
   return(dateFiles)
 }
 ```
@@ -234,7 +232,7 @@ SMOStif <- function(datevec, lon, lat){
 ```{r Moisture Tests, eval = FALSE}
 #SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
 SMOStifnames(c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame = data.frame(dates = c("1013/5/18", "1013/5/18", "1013/6/18", "2021/12/12", "1013/6/20", "1013/6/21"))
+testFrame = data.frame(dates = c("2013/5/18", "2013/5/18", "1013/6/18", "2021/12/12", "1013/6/20", "1013/6/21"))
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
 testMoisture = SMOStif(testFrame$dates, 1, 1)
 print(testMoisture)
