@@ -211,6 +211,7 @@ SMOStif <- function(datevec, lon, lat){
     dateFiles[[toString(as.Date(date))]] <- fileRow
   }
   
+  print(dateFiles)
   bind_rows(dateFiles, .id = "Date") %>% 
     mutate(Surface = NA, Subsurface = NA) %>%
     distinct(Surface.File, .keep_all = TRUE) %>% 
@@ -231,9 +232,13 @@ SMOStif <- function(datevec, lon, lat){
 
 ```{r Moisture Tests, eval = FALSE}
 #SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
-SMOStifnames(c("2013/5/18", "2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame = data.frame(dates = c("2013/5/18", "2013/5/18", "1013/6/18", "2021/12/12", "1013/6/20", "1013/6/21"))
+hirano <- csr_dataset("d20200109_HIRANO_PDB")
+hirano_data <- hirano$data
+hirano_dates <- hirano_data$CSR_TIMESTAMP_BEGIN
+SMOStifnames(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+testFrame = data.frame(dates = hirano_dates)
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
+print(testFrame)
 testMoisture = SMOStif(testFrame$dates, 1, 1)
 print(testMoisture)
 testFrame %>% left_join(testMoisture, by="Surface.File") -> testFrame
@@ -275,7 +280,7 @@ week_Q10 <- list()
 year_Q10 <- list()
 yearonly_Q10 <- list()
 MA_set <- list()
-for(rhds in rh_dataset_names){
+for(rhds in rh_dataset_names[-9]){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
   ds_desc <- ds_data$description
@@ -328,13 +333,13 @@ for(rhds in rh_dataset_names){
            DAY_NIGHT = factor(DAY_NIGHT),
            Rs_Rh = factor(Rs_Rh),
            Surface.File = SMOStifnames(CSR_TIMESTAMP_BEGIN)
-          ) ->
-  dsd
+          ) -> dsd
   
   #Table of moisture values based on file name
   moisture_table <- SMOStif(dsd$CSR_TIMESTAMP_BEGIN, lon, lat)
-  
   dsd %>% left_join(moisture_table, by = "Surface.File") -> dsd
+  
+  print(dsd)
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -421,6 +426,8 @@ print(week_Q10)
 summary(week_Q10)
 print(year_Q10)
 summary(year_Q10)
+print(yearonly_Q10)
+summary(yearonly_Q10)
 print(MA_set)
 ```
 
@@ -466,12 +473,11 @@ print(p)
 
 ### Distributions
 ```{r Distr, fig.width=10}
-R2distr <- geom_histogram(color= "black", fill = "white") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red")
-  
-monthR2 <- ggplot(week_Q10, aes(x = R2)) + R2distr + labs(title = "R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.15, y = 400, size = 3)
+#rdistr = geom_histogram(color= "black", fill = "white") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red") 
+monthR2 <- ggplot(week_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red") + labs(title = "R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.15, y = 400, size = 3)
 ggsave("R2 Distribution.png", monthR2)
 
-yearR2 <- ggplot(year_Q10, aes(x = R2)) + R2distr + labs(title = "Year R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.3, y = 20, size = 3)
+yearR2 <- ggplot(year_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red") + labs(title = "Year R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.3, y = 20, size = 3)
 ggsave("Year R2 Distribution.png", yearR2)
 
 a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 12.5) + labs(title = "Q10 Distribution") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept=median(Q10)), linetype="dashed") + geom_text(aes(label = paste("Median =", round(median(Q10), digits=3))), x = 5, y = 150, size = 3) + geom_text(aes(label = paste("Mean =", round(mean(Q10), digits=3))), x = 5, y = 200, size = 3)
@@ -623,7 +629,8 @@ ggplot(month_Q10, aes(MAT, Q10)) +
               method = "lm", linetype = 2, color = "black")
 ggsave("mat_boxplot.png", width = 8, height = 5)
 
-ggplot(yearonly_Q10, aes(temp, SURFACE)) + geom_point(aes(size=Q10))
+ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(0, 25) + xlim(0, 25)
+ggsave("Moistureplot1.png")
 ```
 
 ```{r Site Map}
