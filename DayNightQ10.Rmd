@@ -631,6 +631,9 @@ ggsave("mat_boxplot.png", width = 8, height = 5)
 
 ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(0, 25) + xlim(0, 25)
 ggsave("Moistureplot1.png")
+
+ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(9990, 10010)
+ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10))
 ```
 
 ```{r Site Map}
@@ -642,6 +645,8 @@ addTiles(lflt)
 lflt <- addMarkers(leaflet(db_info), label = db_info$CSR_DATASET)
 addTiles(lflt)
 ```
+
+##QAQC
 
 #Moisture Data
 
