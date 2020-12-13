@@ -15,6 +15,7 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 library(ggplot2)
+theme_set(theme_minimal())
 library(suncalc)
 library(raster)
 library(zoo)
@@ -63,7 +64,9 @@ print(final_results)
 ```
 
 ## calc_q10 Function
-```{r p-value function from https://gettinggeneticsdone.blogspot.com/2011/01/rstats-function-for-extracting-f-test-p.html}
+
+```{r Q10 Function}
+# p-value function from https://gettinggeneticsdone.blogspot.com/2011/01/rstats-function-for-extracting-f-test-p.html
 lmp <- function (modelobject) {
   if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
   f <- summary(modelobject)$fstatistic
@@ -71,9 +74,7 @@ lmp <- function (modelobject) {
   attributes(p) <- NULL
   return(p)
 }
-```
 
-```{r Q10 Function}
 calc_q10 <- function(temp, resp, out.rm = TRUE){
   positives <- resp > 0 & !is.na(temp) & !is.na(resp)
   resp <- resp[positives]
@@ -109,10 +110,24 @@ calc_q10 <- function(temp, resp, out.rm = TRUE){
 
 ```{r Q10 Function Test}
 set.seed(2020)
+q10 <- 2
 x <- 1:20
-y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
+y <- q10 ^ (x/10) + rnorm(length(x), sd = .3)
 plot(x,y)
-cat("The Q10 Value is", calc_q10(x,y)[,1])
+cat("The Q10 Value should be", q10, "and is", calc_q10(x,y)[,1])
+
+df <- data.frame()
+for(q10 in c(1.5, 2, 3)) {
+  df <- bind_rows(df, tibble(Q10 = q10,
+                             Temperature = x,
+                             Respiration = q10 ^ (x / 10) + rnorm(length(x), sd = 0.3),
+                             Prediction = exp(predict(lm(log(Respiration) ~ Temperature)))))
+}
+df %>% 
+  mutate(Q10 = as.factor(Q10)) %>% 
+  ggplot(aes(Temperature, Respiration, color = Q10)) +
+  geom_point(size = 2) +
+  geom_line(aes(y = Prediction), linetype = 2)
 ```
 
 ## Ts Percentage
@@ -323,6 +338,7 @@ Rh_depths_list <- levels(as.factor(week_Q10$DEPTH[week_Q10$Rs_Rh == "Rh"]))
 Shared_depths_list <- intersect(Rs_depths_list, Rh_depths_list)
 
 for(depth in Shared_depths_list){
+
   Rs_table <- week_Q10 %>% 
     filter(Rs_Rh == "Rs", DEPTH == as.numeric(depth))
  
@@ -370,12 +386,14 @@ ggsave(paste0(depth, "Rs.png"), p)
 ```{r, warning=FALSE, fig.width=10}
 for(depth in Shared_depths_list){
   Rs_table <- week_Q10 %>% filter(DAY_NIGHT == "day", DEPTH == as.numeric(depth))
+
   print(ggplot(Rs_table, aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,12.5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Day Variation by Rs/Rh at depth", depth)))
   print(ggplot(week_Q10 %>% filter(DAY_NIGHT == "night", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,12.5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Night Variation by Rs/Rh at depth", depth)) + 
           theme(
             strip.background = element_blank(),
             strip.text.x = element_text(size = 10)
           ))
+
   print(ggplot(week_Q10 %>% filter(DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET), aes(MON_YEAR, Q10, color = Rs_Rh, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,12.5) + facet_grid(DAY_NIGHT~DATASET, scales = "free_x") + labs(title = paste("Day and Night Variation by Rs/Rh at depth", depth)) + 
           theme(
             strip.background = element_blank(),
@@ -387,10 +405,12 @@ for(depth in Shared_depths_list){
 ### Other Graphs
 ```{r, fig.height=10, fig.width=10}
 Rs_table <- week_Q10 %>% filter(Rs_Rh == "Rs", DEPTH == 5)
+
 x2 <- ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,12.5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rs Variation by Day/Night at depth", 5))
 ggsave("Rs5.png", x2)
 Rh_table <- week_Q10 %>% filter(Rs_Rh == "Rh", DEPTH == 5)
 x3 <- ggplot(Rh_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) + geom_point() + ylim(0,12.5) + facet_wrap(~DATASET, scales = "free_x") + labs(title = paste("Rh Variation by Day/Night at depth", 5))
+
 ggsave("Rh5.png", x3)
 ggsave("Rs5.png", x2)
 
