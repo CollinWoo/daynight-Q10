@@ -125,6 +125,7 @@ cat("The Q10 Value is", calc_q10(x,y)[,1])
 ```
 
 ```{r SMOS Functions}
+
 SMOSfiles <- function(date){
   #lastChecked = as.Date(readLines("lastChecked.txt"))
   #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
@@ -164,6 +165,7 @@ extractSMOS <- function(filename, lon, lat){
   return(moistval)
 }
 
+#NOTE: This function does NOT WORK
 SMOStifnames <- function(datevec){
   tifiles <- list.files("LO3_tif")
   dateFiles <- c()
