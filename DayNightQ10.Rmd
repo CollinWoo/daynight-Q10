@@ -43,7 +43,7 @@ results <- list()
 ```{r goal1, eval=TRUE, echo=FALSE}
 print(bio)
 print(precip)
-rh_dataset_names <- db_info[grep("Rh", db_info$CSR_MSMT_VAR),1][[1]]
+rh_dataset_names <- db_info[grep("Rh", db_info$CSR_MSMT_VAR), ][[1]]
 for(rhds in rh_dataset_names){
   print(rhds)
 }
@@ -97,7 +97,7 @@ calc_q10 <- function(temp, resp, out.rm = TRUE){
     resp <- as.vector(resp[-resp_outliers])
   }
   if(length(resp) < 4){
-    return(NA)
+    return(data.frame(Q10 = NA, R2 = NA, P_VALUE = NA))
   }
   
   lnresp <- log(resp)
@@ -122,6 +122,8 @@ x <- 1:20
 y <- 2 ^ (x/10) + rnorm(length(x), sd = .3)
 plot(x,y)
 cat("The Q10 Value is", calc_q10(x,y)[,1])
+
+calc_q10(1:20, rep(NA, times=20))
 ```
 
 ```{r SMOS Functions}
@@ -245,42 +247,20 @@ testFrame %>% left_join(testMoisture, by="Surface.File") -> testFrame
 print(testFrame)
 ```
 
-## Ts Percentage
-```{r Ts Percentage, eval=FALSE}
-main_results <- list()
-for(rhds in rh_dataset_names){
-  ds_data <- csr_dataset(rhds)
-  dsd <- ds_data$data
-  column_names <- names(dsd)
-  temperature_columns <- column_names[grep("^CSR_T(AIR|[0-9]+)", column_names)]
-  results <- data.frame(columns = temperature_columns, depth = NA, q10 = NA, n = NA)
-  resp <- dsd$CSR_FLUX_CO2
-  for(tcol in temperature_columns){
-    temp <- dsd[[tcol]]
-    results$q10[results$columns == tcol] = calc_q10(temp, resp)[,1]
-    results$n[results$columns == tcol] = length(temp[!is.na(temp) & !is.na(resp)])
-    depth <- gsub("^CSR_T", "", tcol)
-    #Check to see if depth is a number, if it isn't (if it's AIR) then depth is set to -1
-    if(!is.na(as.numeric(depth))){
-      depth <- as.numeric(depth)
-    }else{
-      depth <- -1
-    }
-    results$depth[results$columns == tcol] = depth
-  }
-  main_results[[rhds]] <- results
-}
-main_results <- bind_rows(main_results, .id = "Dataset")
-print(summary(main_results))
-```
-
 ## Q10 By Week and Day/Night
 ```{r by week, cache = TRUE}
 week_Q10 <- list()
 year_Q10 <- list()
 yearonly_Q10 <- list()
 MA_set <- list()
-for(rhds in rh_dataset_names[-9]){
+
+#List of datasets that measure Rs and have a $data data frame
+db_info %>% 
+  filter(!is.na(CSR_RECORDS) & grepl("Rs", CSR_MSMT_VAR)) %>%
+  pull(CSR_DATASET) -> Rs_Datasets
+print(Rs_Datasets)
+
+for(rhds in Rs_Datasets){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
   ds_desc <- ds_data$description
@@ -332,14 +312,7 @@ for(rhds in rh_dataset_names[-9]){
            YEAR = year(CSR_TIMESTAMP_END),
            DAY_NIGHT = factor(DAY_NIGHT),
            Rs_Rh = factor(Rs_Rh),
-           Surface.File = SMOStifnames(CSR_TIMESTAMP_BEGIN)
           ) -> dsd
-  
-  #Table of moisture values based on file name
-  moisture_table <- SMOStif(dsd$CSR_TIMESTAMP_BEGIN, lon, lat)
-  dsd %>% left_join(moisture_table, by = "Surface.File") -> dsd
-  
-  print(dsd)
   
   for(tcol in temperature_columns){
     dsd$temp <- dsd[[tcol]]
@@ -358,11 +331,8 @@ for(rhds in rh_dataset_names[-9]){
                 Q10 = calc_q10(temp, CSR_FLUX_CO2, out.rm = TRUE),
                 TEMP = mean(temp, na.rm=TRUE), 
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
-                SURFACE = mean(Surface),
-                SUBSURFACE = mean(Subsurface),
                 IGBP = igbp,
                 N = n()) %>% 
-      unpack(cols = Q10) %>%
       mutate(MON_YEAR = paste(YEAR, MONTH, 15, sep = "/"), 
              MON_YEAR = as.Date(MON_YEAR)
              ) -> 
@@ -375,11 +345,8 @@ for(rhds in rh_dataset_names[-9]){
                 Q10 = calc_q10(temp, CSR_FLUX_CO2, out.rm=TRUE),
                 TEMP = mean(temp, na.rm=TRUE),
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
-                SURFACE = mean(Surface),
-                SUBSURFACE = mean(Subsurface),
                 IGBP = igbp,
-                N = n()) %>%
-      unpack(cols = Q10) ->
+                N = n()) ->
       year_Q10[[paste(rhds, depth, sep="_")]]
     
      dsd %>%
@@ -389,11 +356,8 @@ for(rhds in rh_dataset_names[-9]){
                 Q10 = calc_q10(temp, CSR_FLUX_CO2, out.rm=TRUE),
                 TEMP = mean(temp, na.rm=TRUE),
                 RESP = mean(CSR_FLUX_CO2, na.rm = TRUE),
-                SURFACE = mean(Surface),
-                SUBSURFACE = mean(Subsurface),
                 IGBP = igbp,
-                N = n()) %>%
-      unpack(cols = Q10) ->
+                N = n()) ->
       yearonly_Q10[[paste(rhds, depth, sep="_")]]
   }
 }
@@ -402,6 +366,7 @@ for(rhds in rh_dataset_names[-9]){
 MA_set <- bind_rows(MA_set, .id = "DATASET")
 
 bind_rows(week_Q10, .id = "ID") %>% 
+  unpack(cols = Q10) %>%
   filter(!is.na(Q10), is.finite(Q10)) %>% 
   dplyr::select(DATASET, YEAR:MONTH, MON_YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, IGBP, N) %>% 
   arrange(DATASET, DEPTH, YEAR, MONTH) %>%
@@ -409,6 +374,7 @@ bind_rows(week_Q10, .id = "ID") %>%
   week_Q10
 
 bind_rows(year_Q10, .id = "ID") %>% 
+  unpack(cols = Q10) %>%
   filter(!is.na(Q10), is.finite(Q10)) %>% 
   dplyr::select(DATASET, YEAR, DAY_NIGHT, Rs_Rh, DEPTH:RESP, IGBP, N) %>% 
   arrange(DATASET, DEPTH, YEAR) %>%
@@ -416,8 +382,9 @@ bind_rows(year_Q10, .id = "ID") %>%
   year_Q10
 
 bind_rows(yearonly_Q10, .id = "ID") %>% 
+  unpack(cols = Q10) %>%
   filter(!is.na(Q10), is.finite(Q10)) %>% 
-  dplyr::select(DATASET, YEAR, DEPTH:RESP, SURFACE, SUBSURFACE, IGBP, N) %>% 
+  dplyr::select(DATASET, YEAR, DEPTH:RESP, IGBP, N) %>% 
   arrange(DATASET, DEPTH, YEAR) %>%
   left_join(MA_set, by = "DATASET") -> 
   yearonly_Q10
@@ -628,12 +595,6 @@ ggplot(month_Q10, aes(MAT, Q10)) +
   geom_smooth(data = filter(month_Q10, MAT >= 5), 
               method = "lm", linetype = 2, color = "black")
 ggsave("mat_boxplot.png", width = 8, height = 5)
-
-ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(0, 25) + xlim(0, 25)
-ggsave("Moistureplot1.png")
-
-ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(9990, 10010)
-ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10))
 ```
 
 ```{r Site Map}
