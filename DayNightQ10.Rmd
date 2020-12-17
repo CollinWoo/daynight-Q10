@@ -166,7 +166,7 @@ extractSMOS <- function(filename, lon, lat){
 # Build NASA-USDA Soil Moisture filenames from a vector of dates
 SMOStifnames <- function(datevec){
   stopifnot(all(is.Date(datevec)))
-  tifiles <- list.files("./L03/", full.names = TRUE, pattern = "*.tif")
+  tifiles <- list.files("./L03/", full.names = TRUE, pattern = "as1.tif")
   
   # datevec may be long, but there are only so many *unique* dates
   unique_datevec <- unique(datevec)
