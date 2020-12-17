@@ -241,7 +241,7 @@ SMOStif <- function(datevec, lon, lat){
 hirano <- csr_dataset("d20200109_HIRANO_PDB")
 hirano_data <- hirano$data
 hirano_dates <- hirano_data$CSR_TIMESTAMP_BEGIN
-SMOStifnames(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
+SMOStifnames(as.Date(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21")))
 testFrame = data.frame(dates = as.Date(hirano_dates))
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
 print(testFrame)
