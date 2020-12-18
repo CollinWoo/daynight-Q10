@@ -169,30 +169,29 @@ SMOStifnames <- function(datevec){
   tifiles <- list.files("./L03/", full.names = TRUE, pattern = "as1.tif")
   
   # datevec may be long, but there are only so many *unique* dates
-  unique_datevec <- unique(datevec)
-  # set up result vector
-  dateFiles <-c()
+  # set up the results data frame
+  results <- tibble(date = unique(datevec),
+                        file = NA_character_)
   
-  for(i in seq_along(unique_datevec)){
-    date <- unique_datevec[i]
+  for(i in seq_len(nrow(results))){
+    date <- results$date[i]
     probDate <- format(c(date-1, date, date+1), "%Y%m%d")
     probDate[seq(1, length(probDate), 3)] <- paste0(probDate[seq(1, length(probDate), 3)], "_")
     probDate[seq(3, length(probDate), 3)] <- paste0("_", probDate[seq(3, length(probDate), 3)])
     patterns <- paste(probDate, collapse = "|")
-    matchfiles <- tifiles[grep(patterns, tifiles)]
-    names(matchfiles) <- rep(as.character(date), length(matchfiles))
+    matchfile <- tifiles[grep(patterns, tifiles)]
     
-    dateFiles <- append(dateFiles, matchfiles)  # this is slow
+    if(length(matchfile)){
+      stopifnot(length(matchfile) < 2)  # there should be 0 or 1 matches only
+      results$file[i] <- matchfile
+    }
   }
   
-  if(length(dateFiles)) {
-    results <- tibble(date = names(dateFiles), files = dateFiles)
-    data.frame(date = as.character(datevec)) %>% 
-      left_join(results, by = "date") %>% 
-      pull(files)
-  } else {  # if no matches at all, just return NA
-    rep(NA_character_, length(datevec))
-  }
+  # now that we have the filenames for our unique dates, merge with the full
+  # `datevec` and return to caller
+  data.frame(date = datevec) %>% 
+    left_join(results, by = "date") %>% 
+    pull(file)
 }
 
 SMOStif <- function(datevec, lon, lat){
