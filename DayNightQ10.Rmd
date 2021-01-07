@@ -11,9 +11,9 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-	echo = TRUE,
-	message = FALSE,
-	warning = FALSE
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
 )
 library(dplyr)
 library(tidyr)
@@ -130,7 +130,7 @@ SMOSfiles <- function(date){
   #lastChecked = as.Date(readLines("lastChecked.txt"))
   #scrape https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/ for file names
   read_html("https://gimms.gsfc.nasa.gov/SMOS/jbolten/FAS/L03/") %>%
-  html_nodes(".indexcolname") %>% html_text() -> filenames
+    html_nodes(".indexcolname") %>% html_text() -> filenames
   fileDate <- as.Date(date)
   #create vector of all possible file name dates
   probDate <- c(fileDate-1, fileDate, fileDate+1)
@@ -158,37 +158,41 @@ SMOSfiles <- function(date){
   return(data.frame(as.list(matchfiles)))
 }
 
+# Extract soil moisture data for a given {lon,lat} from `filename`
 extractSMOS <- function(filename, lon, lat){
-  moisture <- raster(filename)
   sp <- SpatialPoints(cbind(lon, lat), proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs"))
-  moistval <- raster::extract(moisture, sp)
-  return(moistval)
+  raster::extract(raster(filename), sp)
 }
 
-#NOTE: This function does NOT WORK
+
+# Build NASA-USDA Soil Moisture filenames from a vector of dates
 SMOStifnames <- function(datevec){
-  tifiles <- list.files("LO3_tif")
-  dateFiles <- c()
-  fileDates <- as.Date(datevec)
+  stopifnot(all(is.Date(datevec)))
+  tifiles <- list.files("./LO3_tif/", full.names = TRUE, pattern = "as1.tif")
   
-  for(date in fileDates){
-    probDate <- c(date-1, date, date+1)
-    probDate %>% lapply(as.Date) %>% lapply(format, "%Y%m%d") -> probDate
+  # datevec may be long, but there are only so many *unique* dates
+  # set up the results data frame
+  results <- tibble(date = unique(datevec), filename = NA_character_)
+  
+  for(i in seq_len(nrow(results))){
+    date <- results$date[i]
+    probDate <- format(c(date-1, date, date+1), "%Y%m%d")
     probDate[seq(1, length(probDate), 3)] <- paste0(probDate[seq(1, length(probDate), 3)], "_")
-    probDate[seq(3, length(probDate), 3)] <- paste0("_",probDate[seq(3, length(probDate), 3)])
-    patterns <- paste(probDate, collapse="|")
-    matchfiles <- tifiles[grep(patterns, tifiles)]
+    probDate[seq(3, length(probDate), 3)] <- paste0("_", probDate[seq(3, length(probDate), 3)])
+    patterns <- paste(probDate, collapse = "|")
+    matchfile <- tifiles[grep(patterns, tifiles)]
     
-    if(length(matchfiles) > 0){
-      matchfiles <- paste0("./LO3_tif/", matchfiles)[[1]]
-    }else{
-        matchfiles <- NA
+    if(length(matchfile)){
+      stopifnot(length(matchfile) < 2)  # there should be 0 or 1 matches only
+      results$filename[i] <- matchfile
     }
-    
-    dateFiles <- append(dateFiles, matchfiles)
   }
   
-  return(dateFiles)
+  # now that we have the filenames for our unique dates, merge with the full
+  # `datevec` and return to caller
+  tibble(date = datevec) %>% 
+    left_join(results, by = "date") %>% 
+    pull(filename)
 }
 
 SMOStif <- function(datevec, lon, lat){
@@ -213,7 +217,6 @@ SMOStif <- function(datevec, lon, lat){
     dateFiles[[toString(as.Date(date))]] <- fileRow
   }
   
-  print(dateFiles)
   bind_rows(dateFiles, .id = "Date") %>% 
     mutate(Surface = NA, Subsurface = NA) %>%
     distinct(Surface.File, .keep_all = TRUE) %>% 
@@ -234,11 +237,12 @@ SMOStif <- function(datevec, lon, lat){
 
 ```{r Moisture Tests, eval = FALSE}
 #SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
-hirano <- csr_dataset("d20200109_HIRANO_PDB")
+hirano <- csr_dataset("d20190424_ZHANG_maple")
 hirano_data <- hirano$data
 hirano_dates <- hirano_data$CSR_TIMESTAMP_BEGIN
-SMOStifnames(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"))
-testFrame = data.frame(dates = hirano_dates)
+print(as.Date(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21")))
+SMOStifnames(as.Date(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21")))
+testFrame = data.frame(dates = as.Date(hirano_dates))
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
 print(testFrame)
 testMoisture = SMOStif(testFrame$dates, 1, 1)
@@ -282,6 +286,7 @@ week_Q10 <- list()
 year_Q10 <- list()
 yearonly_Q10 <- list()
 MA_set <- list()
+
 for(rhds in rh_dataset_names[-9]){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
@@ -299,7 +304,7 @@ for(rhds in rh_dataset_names[-9]){
   timezone <- attr(dsd$CSR_TIMESTAMP_END, "tzone")
   
   igbp <- db_info$CSR_IGBP[db_info$CSR_DATASET == rhds]
-    
+  
   sunrise_set <- getSunlightTimes(date, lat, lon, keep = c("sunrise", "sunset"), tz = timezone)
   #sunrise_set <- sunrise.set(lat, lon, date)
   sunrise <- sunrise_set[["sunrise"]]
@@ -334,8 +339,8 @@ for(rhds in rh_dataset_names[-9]){
            YEAR = year(CSR_TIMESTAMP_END),
            DAY_NIGHT = factor(DAY_NIGHT),
            Rs_Rh = factor(Rs_Rh),
-           Surface.File = SMOStifnames(CSR_TIMESTAMP_BEGIN)
-          ) -> dsd
+           Surface.File = SMOStifnames(as.Date(CSR_TIMESTAMP_BEGIN))
+    ) -> dsd
   
   #Table of moisture values based on file name
   moisture_table <- SMOStif(dsd$CSR_TIMESTAMP_BEGIN, lon, lat)
@@ -352,8 +357,8 @@ for(rhds in rh_dataset_names[-9]){
     } else {
       depth <- -1
     }
-   
-     dsd %>% 
+    
+    dsd %>% 
       group_by(YEAR, MONTH, DAY_NIGHT, Rs_Rh) %>% 
       summarize(DATASET = rhds, 
                 DEPTH = depth, 
@@ -367,7 +372,7 @@ for(rhds in rh_dataset_names[-9]){
       unpack(cols = Q10) %>%
       mutate(MON_YEAR = paste(YEAR, MONTH, 15, sep = "/"), 
              MON_YEAR = as.Date(MON_YEAR)
-             ) -> 
+      ) -> 
       week_Q10[[paste(rhds, depth, sep="_")]]
     
     dsd %>%
@@ -384,7 +389,7 @@ for(rhds in rh_dataset_names[-9]){
       unpack(cols = Q10) ->
       year_Q10[[paste(rhds, depth, sep="_")]]
     
-     dsd %>%
+    dsd %>%
       group_by(YEAR) %>%
       summarize(DATASET = rhds,
                 DEPTH = depth,
@@ -537,15 +542,15 @@ Shared_depths_list <- intersect(Rs_depths_list, Rh_depths_list)
 for(depth in Shared_depths_list){
   Rs_table <- week_Q10 %>% 
     filter(Rs_Rh == "Rs", DEPTH == as.numeric(depth))
- 
-   # Do a paired t-test; is daytime Q10 > nighttime Q10?
+  
+  # Do a paired t-test; is daytime Q10 > nighttime Q10?
   Rs_table %>% 
     dplyr::select(DATASET, MON_YEAR, DAY_NIGHT, Q10) %>% 
     spread(DAY_NIGHT, Q10) %>% 
     group_by(DATASET) %>% 
     summarise(t_test_p = t.test(day, night, paired = TRUE)$p.value) -> p_table #%>% 
-    #left_join(Rs_table, by = "DATASET") -> Rs_table
-    
+  #left_join(Rs_table, by = "DATASET") -> Rs_table
+  
   print(p_table)
   
   p <- ggplot(Rs_table, aes(MON_YEAR, Q10, color = DAY_NIGHT, group = paste(YEAR, DAY_NIGHT))) +
@@ -553,7 +558,7 @@ for(depth in Shared_depths_list){
     facet_wrap(~DATASET, scales = "free_x") + 
     labs(title = paste("Rs Variation by Day/Night at depth", depth)) #+ geom_text(stat="identity", position="identity", aes(label = paste("p-value =", round(t_test_p, digits=3))), y = 9, size = 3)
   print(p)
-ggsave(paste0(depth, "Rs.png"), p)
+  ggsave(paste0(depth, "Rs.png"), p)
   
   p <- week_Q10 %>% 
     filter(Rs_Rh == "Rh", DEPTH == as.numeric(depth), DATASET %in% Rs_table$DATASET) %>% 
