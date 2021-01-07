@@ -166,7 +166,7 @@ extractSMOS <- function(filename, lon, lat){
 # Build NASA-USDA Soil Moisture filenames from a vector of dates
 SMOStifnames <- function(datevec){
   stopifnot(all(is.Date(datevec)))
-  tifiles <- list.files("./L03/", full.names = TRUE, pattern = "as1.tif")
+  tifiles <- list.files("./LO3_tif/", full.names = TRUE, pattern = "as1.tif")
   
   # datevec may be long, but there are only so many *unique* dates
   # set up the results data frame
@@ -215,7 +215,6 @@ SMOStif <- function(datevec, lon, lat){
     dateFiles[[toString(as.Date(date))]] <- fileRow
   }
   
-  print(dateFiles)
   bind_rows(dateFiles, .id = "Date") %>% 
     mutate(Surface = NA, Subsurface = NA) %>%
     distinct(Surface.File, .keep_all = TRUE) %>% 
@@ -236,9 +235,10 @@ SMOStif <- function(datevec, lon, lat){
 
 ```{r Moisture Tests, eval = FALSE}
 #SMOStif(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21"), 30, 60)
-hirano <- csr_dataset("d20200109_HIRANO_PDB")
+hirano <- csr_dataset("d20190424_ZHANG_maple")
 hirano_data <- hirano$data
 hirano_dates <- hirano_data$CSR_TIMESTAMP_BEGIN
+print(as.Date(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21")))
 SMOStifnames(as.Date(c("2013/5/18", "2013/6/18", "2021/12/12", "2013/6/20", "2013/6/21")))
 testFrame = data.frame(dates = as.Date(hirano_dates))
 testFrame %>% mutate(Surface.File = SMOStifnames(dates)) -> testFrame
@@ -284,6 +284,7 @@ week_Q10 <- list()
 year_Q10 <- list()
 yearonly_Q10 <- list()
 MA_set <- list()
+
 for(rhds in rh_dataset_names[-9]){
   ds_data <- csr_dataset(rhds)
   dsd <- ds_data$data
@@ -336,7 +337,7 @@ for(rhds in rh_dataset_names[-9]){
            YEAR = year(CSR_TIMESTAMP_END),
            DAY_NIGHT = factor(DAY_NIGHT),
            Rs_Rh = factor(Rs_Rh),
-           Surface.File = SMOStifnames(CSR_TIMESTAMP_BEGIN)
+           Surface.File = SMOStifnames(as.Date(CSR_TIMESTAMP_BEGIN))
     ) -> dsd
   
   #Table of moisture values based on file name
