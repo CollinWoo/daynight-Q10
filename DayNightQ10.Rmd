@@ -315,11 +315,15 @@ for(rhds in rh_dataset_names[-9]){
   
   # MAP data that matches the srdb coordinates
   raster::extract(precip, MA_row[1:2]) -> precip_coords
+  print(precip_coords)
   apply(precip_coords, 1, sum) -> MA_row$MAP
+  apply(precip_coords, 1, sd) -> MA_row$PSD
   
   # The same for MAT
   raster::extract(tmean, MA_row[1:2]) -> tmean_vals
+  print(tmean_vals)
   apply(tmean_vals, 1, mean)/10 -> MA_row$MAT
+  apply(tmean_vals/10, 1, sd) -> MA_row$TSD
   
   #MA_row <- cbind.data.frame(MA_row, raster::extract(bio, MA_row[1:2]))
   MA_set[[rhds]] <- MA_row
@@ -406,6 +410,7 @@ for(rhds in rh_dataset_names[-9]){
 }
 #as.yearmon(paste(YEAR, MONTH), "%Y %m")
 #paste(YEAR, MONTH, 1, sep = "/")
+
 MA_set <- bind_rows(MA_set, .id = "DATASET")
 
 bind_rows(week_Q10, .id = "ID") %>% 
@@ -487,6 +492,12 @@ ggsave("R2 Distribution.png", monthR2)
 yearR2 <- ggplot(year_Q10, aes(x = R2)) + geom_histogram(color= "black", fill = "white") + geom_vline(aes(xintercept = median(R2)), linetype="dashed", color="red") + labs(title = "Year R2 Distribution") + geom_text(aes(label = paste("Median =", round(median(R2), digits=3))), x = 0.3, y = 20, size = 3)
 ggsave("Year R2 Distribution.png", yearR2)
 
+IGBPR2month <- week_Q10 %>% filter(Rs_Rh=="Rs") %>% group_by(IGBP) %>% summarise(medianval = median(R2)) %>% right_join(week_Q10 %>% filter(Rs_Rh=="Rs"), by = "IGBP") %>% ggplot(aes(x = R2)) + geom_histogram(color= "black", fill = "white") + labs(title = "Month Rs R2 Distribution by IGBP") + facet_wrap(~IGBP, scale="free") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept = medianval), color = "red", linetype="dashed", size = 1) + geom_text(aes(label = paste("Median =", round(medianval, digits=3))), x = 0.3, y = 4, size = 3)
+ggsave("IGBP R2 Distribution.png", IGBPR2month)
+
+IGBPR2year <- year_Q10 %>% filter(Rs_Rh=="Rs") %>% group_by(IGBP) %>% summarise(medianval = median(R2)) %>% right_join(year_Q10 %>% filter(Rs_Rh=="Rs"), by = "IGBP") %>% ggplot(aes(x = R2)) + geom_histogram(color= "black", fill = "white") + labs(title = "Year Rs R2 Distribution by IGBP") + facet_wrap(~IGBP, scale="free") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept = medianval), color = "red", linetype="dashed", size = 1) + geom_text(aes(label = paste("Median =", round(medianval, digits=3))), x = 0.3, y = 0.75, size = 3)
+ggsave("IGBP R2 Year Distribution.png", IGBPR2year)
+
 a2 <- ggplot(week_Q10, aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + xlim(0, 12.5) + labs(title = "Q10 Distribution") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept=median(Q10)), linetype="dashed") + geom_text(aes(label = paste("Median =", round(median(Q10), digits=3))), x = 5, y = 150, size = 3) + geom_text(aes(label = paste("Mean =", round(mean(Q10), digits=3))), x = 5, y = 200, size = 3)
 ggsave("Q10 Distribution.png", a2)
 
@@ -499,6 +510,12 @@ ggsave("Rh-Rs Q10 Distribution.png", a3)
 RsRhYear <- year_Q10 %>% group_by(Rs_Rh) %>% summarise(medianval = median(Q10)) %>% right_join(week_Q10, by = "Rs_Rh") %>% ggplot(aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + labs(title = "Year Q10 Distribution by Rs/Rh") + xlim(0, 12.5) + facet_wrap(~Rs_Rh) + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept = medianval), color = "red", linetype="dashed", size = 1) + geom_text(aes(label = paste("Median =", round(medianval, digits=3))), x = 5, y = 150, size = 3)
 ggsave("Rh-Rs Year Q10 Distribution.png", RsRhYear)
 
+IGBPmonth <- week_Q10 %>% filter(Rs_Rh=="Rs") %>% group_by(IGBP) %>% summarise(medianval = median(Q10)) %>% right_join(week_Q10 %>% filter(Rs_Rh=="Rs"), by = "IGBP") %>% ggplot(aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + labs(title = "Month Rs Q10 Distribution by IGBP") + xlim(0, 12.5) + facet_wrap(~IGBP, scale="free_y") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept = medianval), color = "red", linetype="dashed", size = 1) + geom_text(aes(label = paste("Median =", round(medianval, digits=3))), x = 8, y = 10, size = 3)
+ggsave("IGBP Q10 Distribution.png", IGBPmonth)
+
+IGBPyear <- year_Q10 %>% filter(Rs_Rh=="Rs") %>%  group_by(IGBP) %>% summarise(medianval = median(Q10)) %>% right_join(week_Q10 %>% filter(Rs_Rh=="Rs"), by = "IGBP") %>% ggplot(aes(x = Q10)) + geom_histogram(color= "black", fill = "white") + labs(title = "Year Rs Q10 Distribution by IGBP") + xlim(0, 12.5) + facet_wrap(~IGBP, scale="free_y") + stat_bin(geom="text", aes(label=..count..), size = 2, vjust = -1) + geom_vline(aes(xintercept = medianval), color = "red", linetype="dashed", size = 1) + geom_text(aes(label = paste("Median =", round(medianval, digits=3))), x = 8, y = 10, size = 3)
+ggsave("Year IGBP Q10 Distribution.png", IGBPyear)
+
 b <- ggplot(week_Q10, aes(x = R2, fill=DAY_NIGHT)) + geom_histogram(position = "dodge2") + facet_wrap(~DATASET) + labs(title = "R2 By Dataset")
 ggsave("R2 By Dataset.png", b)
 c <- ggplot(week_Q10, aes(x = Q10, fill=DAY_NIGHT)) + geom_histogram(position = "dodge2") + xlim(0, 12.5) + facet_wrap(~DATASET) + labs(title = "Q10 By Dataset")
@@ -506,10 +523,14 @@ ggsave("Q10 By Dataset.png", c)
 
 print(monthR2)
 print(yearR2)
+print(IGBPR2month)
+print(IGBPR2year)
 print(a2)
 print(yearQ10)
 print(a3)
 print(RsRhYear)
+print(IGBPmonth)
+print(IGBPyear)
 print(b)
 print(c)
 ```
@@ -641,6 +662,9 @@ ggsave("Moistureplot1.png")
 
 ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(9990, 10010)
 ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10))
+
+ggplot(year_Q10 %>% filter(DEPTH==-1, Rs_Rh == "Rh"), aes(PSD, Q10)) + geom_point(aes(color=DATASET))
+ggplot(year_Q10 %>% filter(DEPTH==-1, Rs_Rh == "Rh"), aes(PSD, Q10)) + geom_point(aes(color=DATASET))
 ```
 
 ```{r Site Map}
