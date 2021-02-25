@@ -318,12 +318,14 @@ for(rhds in rh_dataset_names[-9]){
   print(precip_coords)
   apply(precip_coords, 1, sum) -> MA_row$MAP
   apply(precip_coords, 1, sd) -> MA_row$PSD
+  MA_row$PSD/MA_row$MAP -> MA_row$PCV
   
   # The same for MAT
   raster::extract(tmean, MA_row[1:2]) -> tmean_vals
   print(tmean_vals)
   apply(tmean_vals, 1, mean)/10 -> MA_row$MAT
   apply(tmean_vals/10, 1, sd) -> MA_row$TSD
+   MA_row$TSD/MA_row$MAT -> MA_row$TCV
   
   #MA_row <- cbind.data.frame(MA_row, raster::extract(bio, MA_row[1:2]))
   MA_set[[rhds]] <- MA_row
@@ -663,8 +665,8 @@ ggsave("Moistureplot1.png")
 ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10)) + ylim(9990, 10010)
 ggplot(yearonly_Q10, aes(TEMP, SURFACE)) + geom_point(aes(size=Q10))
 
-ggplot(year_Q10 %>% filter(DEPTH==-1, Rs_Rh == "Rh"), aes(PSD, Q10)) + geom_point(aes(color=DATASET))
-ggplot(year_Q10 %>% filter(DEPTH==-1, Rs_Rh == "Rh"), aes(PSD, Q10)) + geom_point(aes(color=DATASET))
+ggplot(year_Q10 %>% filter(DEPTH==-1, Rs_Rh == "Rh"), aes(PCV, Q10)) + geom_point(aes(color=DATASET))
+ggplot(year_Q10 %>% filter(DEPTH==-1, Rs_Rh == "Rh"), aes(TCV, Q10)) + geom_point(aes(color=DATASET))
 ```
 
 ```{r Site Map}
